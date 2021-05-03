@@ -1,0 +1,49 @@
+diff --git a/util-linux/fdisk.c b/util-linux/fdisk.c
+index c50ceead1..65f0e19a7 100644
+--- a/util-linux/fdisk.c
++++ b/util-linux/fdisk.c
+@@ -34,7 +34,7 @@
+ //config:config FEATURE_AIX_LABEL
+ //config:	bool "Support AIX disklabels"
+ //config:	default n
+-//config:	depends on FDISK && FEATURE_FDISK_WRITABLE
++//config:	depends on FDISK
+ //config:	help
+ //config:	Enabling this option allows you to create or change AIX disklabels.
+ //config:	Most people can safely leave this option disabled.
+@@ -42,7 +42,7 @@
+ //config:config FEATURE_SGI_LABEL
+ //config:	bool "Support SGI disklabels"
+ //config:	default n
+-//config:	depends on FDISK && FEATURE_FDISK_WRITABLE
++//config:	depends on FDISK
+ //config:	help
+ //config:	Enabling this option allows you to create or change SGI disklabels.
+ //config:	Most people can safely leave this option disabled.
+@@ -50,7 +50,7 @@
+ //config:config FEATURE_SUN_LABEL
+ //config:	bool "Support SUN disklabels"
+ //config:	default n
+-//config:	depends on FDISK && FEATURE_FDISK_WRITABLE
++//config:	depends on FDISK
+ //config:	help
+ //config:	Enabling this option allows you to create or change SUN disklabels.
+ //config:	Most people can safely leave this option disabled.
+@@ -58,7 +58,7 @@
+ //config:config FEATURE_OSF_LABEL
+ //config:	bool "Support BSD disklabels"
+ //config:	default n
+-//config:	depends on FDISK && FEATURE_FDISK_WRITABLE
++//config:	depends on FDISK
+ //config:	help
+ //config:	Enabling this option allows you to create or change BSD disklabels
+ //config:	and define and edit BSD disk slices.
+@@ -66,7 +66,7 @@
+ //config:config FEATURE_GPT_LABEL
+ //config:	bool "Support GPT disklabels"
+ //config:	default n
+-//config:	depends on FDISK && FEATURE_FDISK_WRITABLE
++//config:	depends on FDISK
+ //config:	help
+ //config:	Enabling this option allows you to view GUID Partition Table
+ //config:	disklabels.

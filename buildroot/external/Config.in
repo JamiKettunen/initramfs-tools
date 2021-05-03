@@ -1,0 +1,2 @@
+source "$BR2_EXTERNAL_initramfs_extras_PATH/package/msm-fb-refresher/Config.in"
+source "$BR2_EXTERNAL_initramfs_extras_PATH/package/reboot-mode/Config.in"

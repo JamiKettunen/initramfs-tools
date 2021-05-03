@@ -1,0 +1,55 @@
+# Build
+BR2_PER_PACKAGE_DIRECTORIES=y
+BR2_ZCAT="pigz -d -c"
+
+# Ccache (~/.buildroot-ccache)
+# NOTE: This will make the initial build quite a bit slower, but subsequent
+#       builds with no/miniscule changes should yield massive gains!
+#       The directory also has to be cleared from time to time.
+BR2_CCACHE=y
+BR2_CCACHE_INITIAL_SETUP="--max-size=10G"
+BR2_CCACHE_USE_BASEDIR=y
+
+# static binaries
+BR2_STATIC_LIBS=y
+
+# musl libc
+BR2_TOOLCHAIN_BUILDROOT_MUSL=y
+
+# Toolchain
+BR2_BINUTILS_VERSION_2_36_X=y
+BR2_GCC_VERSION_10_X=y
+BR2_GCC_ENABLE_LTO=y
+BR2_GCC_ENABLE_GRAPHITE=y
+
+# Target kernel headers matching lowest common denominator
+@BR2_KERNEL_HEADERS@
+
+# System
+BR2_ROOTFS_SKELETON_CUSTOM=y
+BR2_ROOTFS_SKELETON_CUSTOM_PATH="$(TOPDIR)/../skeleton"
+BR2_ROOTFS_POST_FAKEROOT_SCRIPT="$(TOPDIR)/../br2_mkinitramfs.sh"
+BR2_INIT_NONE=y
+
+# Busybox
+BR2_PACKAGE_BUSYBOX_CONFIG="$(TOPDIR)/../busybox_debug.config"
+
+# Packages
+BR2_PACKAGE_E2FSPROGS=y
+# BR2_PACKAGE_E2FSPROGS_FSCK is not set
+BR2_PACKAGE_E2FSPROGS_RESIZE2FS=y
+
+# Custom external packages
+BR2_PACKAGE_REBOOT_MODE=y
+BR2_PACKAGE_MSM_FB_REFRESHER=y
+
+# Filesystem images
+BR2_TARGET_ROOTFS_TAR=y
+BR2_TARGET_ROOTFS_TAR_GZIP=y
+
+# Cleanup
+# BR2_PACKAGE_IFUPDOWN_SCRIPTS is not set
+# BR2_PACKAGE_URANDOM_SCRIPTS is not set
+# BR2_ENABLE_LOCALE is not set
+# NOTE: can't disable locale support on musl -> keep C locale
+BR2_ENABLE_LOCALE_WHITELIST="C"

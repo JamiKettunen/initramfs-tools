@@ -1,0 +1,121 @@
+#!/bin/sh
+for f in /functions/*.sh; do . $f; done
+
+# Log a message to init.log (and boot console in case non-silent boot)
+init_log() { [ $silent_boot -eq 1 ] && dbg_kmsg "$1" || log_kmsg "$1"; }
+
+# Setup the bare minimum mounts for a Linux userspace
+mount_proc_sys_dev() {
+	mkdir /proc /sys
+	mount -t proc -o nosuid,nodev,noexec proc /proc || hang "ERROR: Couldn't mount proc on /proc!" 1
+	dbg "Took $(cut -d' ' -f1 /proc/uptime) seconds to initialize the bare minimum"
+	mount -t sysfs -o nosuid,nodev,noexec sysfs /sys || hang "ERROR: Couldn't mount sysfs on /sys!" 1
+	mount -t devtmpfs -o nosuid devtmpfs /dev || log_kmsg "ERROR: Couldn't mount devtmpfs on /dev!" 1
+	mkdir /dev/pts
+	mount -t devpts -o nosuid,noexec devpts /dev/pts || log_kmsg "ERROR: Couldn't mount devpts on /dev/pts!" 1
+}
+
+# Stop execution with a message & either sleep forever or drop to shell
+# $1 = message
+# $2 = optional kmsg loglevel (default: 6)
+hang() {
+	[ "$1" ] && log_kmsg "$1" "$2"
+	mount | grep -q /rootfs_par && sh -c "sleep 2; cp /init.log /rootfs_par/; sync" &
+
+	hook_exec configfs
+	hook_exec rndis
+	hook_exec telnetd
+
+	log "@HANG_MSG@"
+	@HANG_CMD@
+}
+
+# Used in case rd.rootfs not defined OR if $rootfs_par not found within 10 seconds
+list_pars_and_hang() {
+	log_kmsg "       Valid partitions (>=$ignore_pars_under_str in size) under /dev/:" 2
+	PARS="$(list_pars)"
+	log_kmsg "$PARS" 2
+	hang
+}
+
+# Move enabled extra hooks so they get picked up by /init
+setup_extra_hooks() {
+	extra_hooks=$(get_opt extra_hooks) # e.g. "a,b,c,..."
+	[ "$extra_hooks" ] || return # no extra hooks enabled
+	if [ ! -d "/hooks/extra" ]; then
+		log "WARNING: rd.extra_hooks=$extra_hooks specified on cmdline but
+         no /hooks/extra directory found; ignoring..."
+		return
+	fi
+
+	[ -z "${extra_hooks##*,*}" ] && \
+		extra_hooks="$(echo $extra_hooks | sed 's/,/ /g')" # e.g. "a,b,c" -> "a b c"
+
+	for hook in $extra_hooks; do
+		# e.g. "late/umtprd" -> "late/*-umtprd"
+		if [ -z "${hook##*/*}" ]; then
+			hook_match="$(echo "$hook" | sed 's|/|/*-|')"
+		else
+			hook_match="*-$hook"
+		fi
+		hook_file="$(ls /hooks/extra/$hook_match 2>/dev/null)"
+		if [ -z "$hook_file" ]; then
+			log "WARNING: Specified extra hook '$hook' wasn't found; ignoring..."
+			continue
+		fi
+
+		is_late=0
+		begins_with "late/" "$hook" && is_late=1
+		if [ $is_late -eq 0 ]; then
+			[ -e /hooks ] || mkdir /hooks
+			mv "$hook_file" /hooks/
+		else
+			[ -e /hooks/late ] || mkdir -p /hooks/late
+			mv "$hook_file" /hooks/late/
+		fi
+	done
+}
+
+# Parse $rootfs_par from $rootfs with prep for NBD; $parse_rootfs_par_error codes:
+# 0 = None
+# 1 = Invalid partition device
+parse_rootfs_par() {
+	slash_count=0
+	if begins_with "nbd" "$rootfs"; then # NBD
+		load_module nbd
+		rootfs_par="/dev/nbd0"
+	else
+		slash_count=$(count_chars "/" "$rootfs") # e.g. 2
+		if [ $slash_count -lt 2 ]; then # invalid
+			parse_rootfs_par_error=1; return
+		elif [ $slash_count -eq 2 ]; then # partition
+			rootfs_par="$rootfs"
+		else # file (loopback image) or directory
+			rootfs_par="$(echo "$rootfs" | awk -F/ '{print $1 FS $2 FS $3}')"
+		fi
+	fi
+	parse_rootfs_par_error=0
+}
+
+# Wait for $rootfs_par to appear in 10 seconds
+wait_for_rootfs_par() {
+	recheck_count=0
+	success=0
+	while [[ $success -eq 0 && $recheck_count -lt 10 ]]; do
+		if [ ! -e "$rootfs_par" ]; then
+			if [ $recheck_count -eq 0 ]; then
+				log "WARNING: The specified rd.rootfs partition on kernel cmdline is invalid or doesn't
+         exist (yet)! Retrying for 10 seconds..." 4
+			fi
+			sleep 1
+			recheck_count=$((recheck_count+1))
+		else
+			success=1
+		fi
+	done
+	if [ $success -eq 0 ]; then
+		log_kmsg "ERROR: The specified rd.rootfs partition ($rootfs_par) on kernel cmdline couldn't
+       be located!" 2
+		list_pars_and_hang
+	fi
+}

@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+type log >/dev/null || . /functions/core.sh # for log()
+
+# Helper script meant to be ran from within the blink-leds hook for each
+# found LED sysfs path given as the first argument
+led="$1" # e.g. '/sys/class/leds/white:kbd_backlight'
+brightness_max=$(cat "$led/max_brightness")
+blink_interval=0.5 # interval to blink at in seconds
+
+log "Blinking '$led' at $blink_interval times a second..."
+
+while true; do
+	brightness_now=$(cat "$led/brightness")
+	if [ $brightness_now -ne $brightness_max ]; then
+		brightness_now=$brightness_max
+	else
+		brightness_now=0
+	fi
+	echo $brightness_now > "$led/brightness"
+	sleep $blink_interval
+done

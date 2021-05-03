@@ -1,0 +1,60 @@
+#!/bin/sh
+
+# Standalone prep
+if [[ -z "$KERNEL_VER" || -z "$DEVICE_MODEL" ]]; then
+	type eval_const >/dev/null || . /functions/core.sh
+	eval_const KERNEL_VER DEVICE_MODEL
+fi
+type load_module >/dev/null || . /functions/kmod.sh
+
+# ref. https://www.kernel.org/doc/Documentation/usb/gadget_configfs.txt
+setup_configfs() {
+	[ -e /config ] && return # already done
+	dbg "setup_configfs()"
+
+	load_module udc-core # loaded by configfs?
+	load_module configfs
+	load_module libcomposite
+
+	mkdir -p /config
+	if ! mount -t configfs -o nodev,noexec,nosuid configfs /config; then
+		log "Couldn't mount /config!"
+		return
+	fi
+	if [ ! -e /config/usb_gadget ]; then
+		log "/config/usb_gadget does not exist, skipping configfs usb gadget"
+		return
+	fi
+
+	# Initialize first gadget
+	GADGET=/config/usb_gadget/g1
+	if ! mkdir $GADGET; then
+		log "Couldn't create $GADGET"
+		return
+	fi
+
+	# User-facing vendor/product IDs (and by extension names)
+	echo "0x18D1" > $GADGET/idVendor  # default: Google Inc.
+	echo "0xD001" > $GADGET/idProduct # default: Nexus 4 (fastboot)
+
+	# User-facing gadget strings
+	STRINGS=$GADGET/strings/0x409
+	if mkdir $STRINGS; then
+		MANUFACTURER="$(echo "$DEVICE_MODEL" | cut -d' ' -f1)" # e.g. 'OnePlus'
+		echo "$MANUFACTURER" > "$STRINGS/manufacturer"
+		echo "Initramfs (on kernel $KERNEL_VER)" > "$STRINGS/serialnumber" # SoMainline
+		echo "$DEVICE_MODEL" > "$STRINGS/product"
+	else
+		log "Couldn't create $STRINGS"
+	fi
+
+	# Prepare first gadget config + strings dir
+	CONFIG=$GADGET/configs/c.1
+	if mkdir $CONFIG; then
+		mkdir $CONFIG/strings/0x409 || log "Couldn't create $CONFIG/strings/0x409"
+	else
+		log "Couldn't create $CONFIG"
+	fi
+}
+
+setup_configfs

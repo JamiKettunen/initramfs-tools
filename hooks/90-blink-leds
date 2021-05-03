@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Standalone prep
+type log >/dev/null || . /functions/core.sh
+
+# A hook that starts blinking all leds found under /sys/class/leds/
+log "Blinking all found LEDs..."
+find /sys/class/leds/ -maxdepth 1 -type l -exec sh -c "blink-led \"{}\" &" \;

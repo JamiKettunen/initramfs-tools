@@ -1,0 +1,11 @@
+# Build dir
+/buildroot-git
+
+# Staging BusyBox config changes
+/busybox*.config.new
+
+# Concatenated build config
+/external/configs/final_defconfig
+
+# Build artifact
+/rootfs.tar.gz

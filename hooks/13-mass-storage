@@ -1,0 +1,25 @@
+#!/bin/sh
+# TODO: hook_depends_on=configfs
+
+# Standalone prep
+type load_module >/dev/null || . /functions/kmod.sh
+
+setup_configfs_mass_storage() {
+	GADGET=/config/usb_gadget/g1
+	if [ ! -e "$GADGET" ]; then
+		log "$GADGET does not exist, skipping configfs usb gadget"
+		return
+	fi
+	FUNCS=$GADGET/functions
+	F_MASS_STORAGE=$FUNCS/mass_storage.0
+	[ -e "$F_MASS_STORAGE" ] && return # already setup
+
+	load_module usb_f_mass_storage luns=0
+	mkdir $F_MASS_STORAGE || log "Couldn't create $F_MASS_STORAGE!"
+
+	# setup mass storage in case rndis wasn't
+	F_RNDIS=$FUNCS/rndis.usb0
+	[ ! -e "$F_RNDIS" ] && toggle-mass-storage on
+}
+
+setup_configfs_mass_storage

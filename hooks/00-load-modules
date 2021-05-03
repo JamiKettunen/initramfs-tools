@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Load all modules as specified in KERNEL_MODULES_PROBE list
+if [ ! -d /lib/modules ]; then
+	log "load-modules: /lib/modules doesn't exist, refusing to continue..."
+	exit 1
+fi
+
+modules="@KERNEL_MODULES_PROBE@"
+if [ "$modules" ]; then
+	if [ ! -d "/lib/modules/$KERNEL_VER" ]; then
+		dbg "Skipping kernel module loading due to missing modules dir..."
+		return
+	fi
+	dbg "Loading kernel modules '$modules'..."
+	modprobe -a $modules
+fi

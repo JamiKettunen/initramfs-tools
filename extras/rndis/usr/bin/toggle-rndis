@@ -1,0 +1,39 @@
+#!/bin/sh
+if [[ "$1" != "on" && "$1" != "off" ]]; then
+	echo "usage: $0 on|off [keep_none]"
+	return
+fi
+# Standalone prep
+type log >/dev/null || . /functions/core.sh
+
+dbg "$(basename $0) $@"
+UDC="$(ls /sys/class/udc)" # e.g. "a800000.dwc3"
+if [ -z "$UDC" ]; then
+	log "No USB Device Controller available"
+	exit 1
+fi
+GADGET=/config/usb_gadget/g1
+BOUND_UDC="$(cat $GADGET/UDC)"
+[ "$BOUND_UDC" ] && echo "" > $GADGET/UDC # unbind
+
+CONFIG=$GADGET/configs/c.1
+FUNCS=$GADGET/functions
+F_NAME="rndis.usb0"
+F_RNDIS=$FUNCS/$F_NAME
+
+# remove this function / all active functions if "keep_none" specified as 2nd arg
+[ "$2" = "keep_none" ] \
+	&& rm -f $CONFIG/*.* \
+	|| rm -f $CONFIG/$F_NAME
+
+if [ "$1" = "on" ]; then
+	ln -s $F_RNDIS $CONFIG || log "Couldn't symlink $F_RNDIS"
+fi
+
+cfg="$(find $CONFIG/ -maxdepth 1 -type l -exec basename {} \; | cut -d. -f1 | sed ':a; N; $!ba; s/\n/+/g')"
+echo "${cfg:-none}" > $CONFIG/strings/0x409/configuration \
+	|| log "Couldn't write configration name"
+
+if [ "$cfg" ]; then
+	echo "$UDC" > $GADGET/UDC || log "Couldn't write UDC"
+fi

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Standalone prep
+type log >/dev/null || . /functions/core.sh
+
+# Start msm-fb-refresher early
+msm-fb-refresher || log "Failed to start msm-fb-refresher!"

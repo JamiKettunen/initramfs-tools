@@ -1,0 +1,54 @@
+#!/bin/sh
+# TODO: hook_depends_on=configfs
+
+# Standalone prep
+if [ -z "$USB_IFACE" ]; then
+	type eval_const >/dev/null || . /functions/core.sh
+	type load_module >/dev/null || . /functions/kmod.sh
+	eval_const USB_IFACE USB_IP
+fi
+
+setup_configfs_rndis() {
+	GADGET=/config/usb_gadget/g1
+	if [ ! -e "$GADGET" ]; then
+		log "$GADGET does not exist, skipping configfs usb gadget"
+		return
+	fi
+	FUNCS=$GADGET/functions
+	F_RNDIS=$FUNCS/rndis.usb0
+	[ -e "$F_RNDIS" ] && return # already setup
+
+	load_module usb_f_rndis
+	mkdir $F_RNDIS || log "Couldn't create $F_RNDIS!"
+
+	toggle-rndis on
+}
+
+start_udhcpd() {
+	[ -e /etc/udhcpd.conf ] && return # already setup
+
+	dbg "start_udhcpd(): Starting udhcpd on $USB_IP/24 (forks to background)..."
+	if ! ifconfig $USB_IFACE $USB_IP netmask 255.255.255.0; then
+		log "Network interface $USB_IFACE not found; available ones include:"
+		ifconfig -a | tee -a /init.log
+		return
+	fi
+
+	mkdir -p /etc /var
+	cat << EOF > /etc/udhcpd.conf
+start $HOST_IP
+end $HOST_IP
+max_leases 1
+auto_time 0
+decline_time 0
+conflict_time 0
+lease_file /var/udhcpd.leases
+interface $USB_IFACE
+option subnet 255.255.255.0
+EOF
+	touch /var/udhcpd.leases
+	udhcpd || log "Failed to start udhcpd on $USB_IFACE at $USB_IP!"
+}
+
+setup_configfs_rndis
+start_udhcpd

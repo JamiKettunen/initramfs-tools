@@ -1,0 +1,5 @@
+Initramfs log can be found in /init.log as well as /rootfs_par/init.log
+in case hang() was called from /init or any of the hooks.
+
+Press <TAB><TAB> to see all available commands.
+

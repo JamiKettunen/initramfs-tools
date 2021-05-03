@@ -1,0 +1,103 @@
+#!/bin/sh
+# shellcheck disable=SC2012,SC2039,SC2093,SC1090,SC1091
+export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+. init_functions
+
+mount_proc_sys_dev
+# forward kernel messages to tty8 to avoid module loading spam etc.
+no_fwdcon=$(get_opt no_fwdcon)
+[ "$no_fwdcon" != "1" ] && setlogcons 8
+silent_boot=$(get_opt silent_boot)
+if [ -e /splash.ppm.gz ]; then
+	# clear potential early kernel logs
+	printf '\033[H\033[2J' > /dev/tty1
+	silent_boot=1
+else
+	no_clear=$(get_opt no_clear)
+	[ "$no_clear" != "1" ] && clear
+fi
+[ -z "$silent_boot" ] && silent_boot=0
+add_const HOST_IP "172.16.42.2"
+add_const USB_IP "172.16.42.1"
+add_const USB_IFACE "@USB_IFACE@" # e.g. "usb0"
+add_const KERNEL_VER "$(uname -r)" # e.g. "5.12.0-oneplus-msm8998"
+add_const DEVICE_MODEL "$(cat /sys/firmware/devicetree/base/model)" # e.g. "OnePlus 5T"
+add_const NPROC $(nproc --all) # e.g. 8
+add_const MEM "$(free | awk 'NR==2 {printf "%.2f\n", $2/1024/1024}') GiB" # e.g. "5.49" or "7.46"
+init_log "Running kernel $KERNEL_VER on a $DEVICE_MODEL (with $NPROC CPUs & $MEM of RAM)"
+
+# Run all early hooks BEFORE rootfs is mounted
+setup_extra_hooks
+for hook in $(find /hooks -maxdepth 1 -type f 2>/dev/null | sort -V); do
+	. "$hook"
+done
+
+# Show boot splash after potential display modules loaded etc.
+[ -e /splash.ppm.gz ] && fbsplash -s /splash.ppm.gz -c &
+
+# RootFS mounting system:
+# 1. if rd.rootfs exists, assuming it is a partition containing the rootfs
+# 2. if it contains at least 2 '/', assume beginning is partition containing
+#    either a rootfs image or directory
+# 3. alternatively, if rd.rootfs starts with "nbd:" assume the rest is a rootfs export
+#    residing on the USB host machine ($HOST_IP)
+rootfs=$(get_opt rootfs) # e.g. "/dev/sde21", "/dev/sda13/.stowaways/sailfishos", "/dev/sda13/rootfs.img"
+
+# Make sure rootfs is defined on kernel cmdline
+if [ -z "$rootfs" ]; then
+	log_kmsg "ERROR: rd.rootfs was not specified! Please add e.g. 'rd.rootfs=/dev/sda13'
+       to your kernel cmdline OR enable the telnetd hook in initramfs and
+       investigate manually using your preferred tools such as 'fdisk -l'!" 2
+	list_pars_and_hang
+fi
+
+# Mounting of $rootfs
+parse_rootfs_par
+if [ $parse_rootfs_par_error -eq 1 ]; then
+	log_kmsg "ERROR: The specified rootfs '$rootfs' is invalid!" 2
+	list_pars_and_hang
+fi
+wait_for_rootfs_par
+mount_rootfs
+if [ $rootfs_mount_error -gt 0 ]; then
+	case $rootfs_mount_error in
+		1) hang "ERROR: Couldn't locate NBD export '$nbd_export' on $HOST_IP!" 2 ;;
+		2) hang "ERROR: Couldn't mount NBD export '$nbd_export' with block size of $nbd_bs!" 2 ;;
+		3) hang "ERROR: Couldn't mount '$rootfs_par'!" 2 ;;
+		4) log_kmsg "ERROR: Couldn't locate rootfs image/directory '$rootfs_location' under
+       '$rootfs_par'! Here's an 'ls -lA':" 2
+			ls -lA /rootfs_par | tee -a /init.log /dev/kmsg
+			hang
+			;;
+		5) hang "ERROR: Couldn't mount rootfs image '$rootfs_location'!" 2 ;;
+	esac
+fi
+init_log "Rootfs type is $rootfs_type"
+
+# Make sure we've got a valid rootfs with /sbin/init
+init=/sbin/init
+if [ ! -e "$rootfs_location$init" ]; then
+	log_kmsg "ERROR: Couldn't locate $init under '$rootfs_location'! Here's an 'ls -lA':" 2
+	ls -lA "$rootfs_location" | tee -a /init.log /dev/kmsg
+	hang
+fi
+
+# Run all late hooks right BEFORE switching root
+for late_hook in $(find /hooks/late -type f 2>/dev/null | sort -V); do
+	. "$late_hook"
+done
+
+# After this point we'll let the rootfs init process take care of things
+telnet_pid=$(pgrep telnetd)
+[ "$telnet_pid" ] && kill $telnet_pid
+total="$(df -Ph | awk 'END {print $2}')"
+usage="$(df -P | awk 'END {print $5}')"
+os=" $(get_os_name "$rootfs_location")"
+init_log "Booting$os from $rootfs_location ($usage of $total used)..."
+# log kernel messages to boot console again on non-silent boots
+[ "$silent_boot" != "1" ] && setlogcons 0
+# silence some distros complaining about a missing /dev/console (e.g. void)
+[ ! -e "$rootfs_location"/dev/console ] \
+	&& mknod "$rootfs_location"/dev/console c 5 1
+exec switch_root "$rootfs_location" $init
+hang "Failed to switch root :(" 2

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Standalone prep
+type hang >/dev/null || . /init_functions
+
+# A blocking hook that simply hangs BEFORE rootfs is mounted
+hang

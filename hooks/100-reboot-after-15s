@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Standalone prep
+type log >/dev/null || . /functions/core.sh
+
+# A blocking hook that simply waits 15 seconds before rebooting the device
+log "Waiting 15 seconds before rebooting..."
+sleep 15
+reboot -f

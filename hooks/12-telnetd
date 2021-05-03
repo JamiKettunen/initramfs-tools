@@ -1,0 +1,17 @@
+#!/bin/sh
+# TODO: hook_depends_on=rndis
+
+# Standalone prep
+if [ -z "$USB_IP" ]; then
+	type eval_const >/dev/null || . /functions/core.sh
+	eval_const USB_IP
+fi
+
+start_telnetd() {
+	pgrep telnetd >/dev/null && return # already done
+
+	dbg "start_telnetd(): Starting on $USB_IP:23 (forks to background)..."
+	telnetd -b "$USB_IP" -l /bin/sh || log "Failed to start telnetd!"
+}
+
+start_telnetd

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Standalone prep
+type log >/dev/null || . /functions/core.sh
+
+# Mount kernel debugfs at /d
+mkdir -p /d
+mount -t debugfs debugfs /d || log "Couldn't mount debugfs at /d!"

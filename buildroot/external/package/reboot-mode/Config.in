@@ -1,0 +1,5 @@
+config BR2_PACKAGE_REBOOT_MODE
+	bool "reboot-mode"
+	help
+	  Reboot a mobile device to a specific mode (such as recovery or
+	  bootloader)

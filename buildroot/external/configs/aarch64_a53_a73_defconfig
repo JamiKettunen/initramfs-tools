@@ -1,0 +1,4 @@
+
+# Architecture (optimized for e.g. Qualcomm MSM8998 with Cortex-A73/A53 big.LITTLE)
+BR2_aarch64=y
+BR2_cortex_a73_a53=y
