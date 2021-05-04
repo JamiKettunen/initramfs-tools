@@ -21,7 +21,7 @@ A bunch of the initramfs features can be configured via kernel cmdline using the
 |`rd.extra_hooks`|`late/extra-hook`, `a,b,c`|Additional hooks to run in initramfs|
 |`rd.mass_storage_rw`|`0` (default) or `1`|Mount all mass storage devices as read-write|
 |`rd.silent_boot`|`0` (default) or `1`|Silence logs from kernel and initramfs, implied on when splash image set|
-|`rd.no_clear`|`1`|Don't clear console on initramfs enter|
+|`rd.no_clear`|`0` (default) or `1`|Don't clear console on initramfs enter|
 |`rd.no_fwdcon`|`0` (default) or `1`|Don't forward kernel messages to `tty8` while starting|
 
 ## Booting
@@ -63,10 +63,9 @@ With those files in place you can start a server with `nbd-server -C nbd_config`
 
 ## Kernel requirements
 Core
-* `CONFIG_RD_GZIP=y` (if using a gzip compressed initramfs)
-* `CONFIG_RD_LZ4=y` (if using an lz4 compressed initramfs)
+* `CONFIG_RD_GZIP=y` (if using `gzip` compression)
+* `CONFIG_RD_LZ4=y` (if using `lz4` compression)
 * `CONFIG_DEVTMPFS=y` (populate `/dev` automatically when `devtmpfs` is mounted)
-* `CONFIG_UEVENT_HELPER=y` (for `mdev` hotplugging support, optional)
 
 Booting
 * `CONFIG_BLK_DEV_LOOP=m` (booting from loopback images)
