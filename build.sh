@@ -20,17 +20,15 @@ err() {
 setup_br2() {
 	if [[ -e "$BR2_TARBALL" && -z "$BR2_SKIP_BUILD" ]]; then
 		read -rp ">> Update Buildroot tarball (y/N)? " update_br
-		if [[ "${update_br^^}" = "Y"* ]]; then
-			BR2_SKIP_BUILD=0
-		else
-			BR2_SKIP_BUILD=1
-		fi
+		[[ "${update_br^^}" = "Y"* ]] && BR2_SKIP_BUILD=0 || BR2_SKIP_BUILD=1
+	elif [ ! -e "$BR2_TARBALL" ]; then
+		BR2_SKIP_BUILD=0
 	fi
-	if [ $BR2_SKIP_BUILD -eq 0 ]; then
-		bash -c "$BASEDIR/buildroot/build.sh"
-	else
-		log "Skipping Buildroot tarball rebuild..."
-	fi
+
+	[ $BR2_SKIP_BUILD -eq 0 ] \
+		&& bash -c "$BASEDIR/buildroot/build.sh" \
+		|| log "Skipping Buildroot tarball rebuild..."
+
 	[ -e "$BR2_TARBALL" ] || err "Buildroot tarball '$BR2_TARBALL' doesn't exist!"
 }
 item_in_array() {
