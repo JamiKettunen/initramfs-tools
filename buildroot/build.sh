@@ -1,10 +1,11 @@
 #!/bin/bash -e
 BASEDIR="$(readlink -f "$(dirname "$0")")"
+INITDIR="$BASEDIR/.."
 
 ##########
 # Config
 ##########
-cd "$BASEDIR/.."
+cd "$INITDIR"
 . config.sh
 cd "$BASEDIR"
 
@@ -41,7 +42,7 @@ if [ -d output ]; then
 	read -erp ">> Clean previous build output artifacts (y/N)? " ans
 	if [[ "${ans^^}" = "Y"* ]]; then
 		m -j clean
-		rm -r output # "$BASEDIR"/rootfs.tar.gz
+		rm -r output # "$INITDIR/$BR2_TARBALL"
 	fi
 fi
 
@@ -83,4 +84,4 @@ fi
 
 log "Starting build with $BR2_BUILD_JOBS jobs..."
 time m -j $BR2_BUILD_JOBS
-cp output/images/rootfs.tar.gz "$BASEDIR"
+cp output/images/rootfs.tar.gz "$INITDIR/$BR2_TARBALL"
