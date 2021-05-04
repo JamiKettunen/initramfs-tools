@@ -86,5 +86,10 @@ BOOT_DROP_TO_SHELL=0
 # common choices include: "usb0", "rndis0" or "eth0"
 BOOT_RNDIS_IFACE="usb0"
 
+# How many seconds to wait until terminating the msm-fb-refresher hook?
+# if this is kept running it can severely affect rendering performance after booting!
+# values <1 = keep running forever
+BOOT_FB_REFRESHER_TIMEOUT=5
+
 # Potential local config overrides
 [ -e config.custom.sh ] && . config.custom.sh

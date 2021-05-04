@@ -162,7 +162,15 @@ setup_hooks() {
 		modules_to_probe="${KERNEL_MODULES_PROBE[@]}"
 		sed "s/@KERNEL_MODULES_PROBE@/$modules_to_probe/" -i initramfs/hooks/*load-modules
 	fi
-	hook_present "msm-fb-refresher" || rm initramfs/usr/bin/msm-fb-refresher
+	if hook_present "msm-fb-refresher"; then
+		if [ $BOOT_FB_REFRESHER_TIMEOUT -gt 0 ]; then
+			sed "s/@FB_REFRESHER_TIMEOUT@/$BOOT_FB_REFRESHER_TIMEOUT/" -i initramfs/hooks/*msm-fb-refresher
+		else
+			sed "s/^timeout @FB_REFRESHER_TIMEOUT@ //" -i initramfs/hooks/*msm-fb-refresher
+		fi
+	else
+		rm initramfs/usr/bin/msm-fb-refresher
+	fi
 	rmdir initramfs/hooks/late 2>/dev/null && rmdir initramfs/hooks 2>/dev/null || :
 	rm -f initramfs/deploy # in case any extras/*/deploy scripts were run
 }
