@@ -38,7 +38,8 @@ get_os_name() {
 	os_release="$1/etc/os-release"
 	build_prop="$1/build.prop"
 	if [[ -e "$os_release" || -L "$os_release" ]]; then # most (if not all) Linux distros
-		[ -L "$os_release" ] && os_release="$(readlink_hack "$os_release" "$1")"
+		[[ ! -e "$os_release" && -L "$os_release" ]] \
+			&& os_release="$(readlink_hack "$os_release" "$1")"
 		os_name="$(grep '^PRETTY_NAME=' $os_release)"
 		[ -z "$os_name" ] && return # no PRETTY_NAME :(
 		eval "$os_name" # e.g. eval PRETTY_NAME="Distro Name"
