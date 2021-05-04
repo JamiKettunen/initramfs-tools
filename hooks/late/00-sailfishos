@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Bind-mount userdata over to /data on the Sailfish OS rootfs
+mount --bind $rootfs_par $rootfs_location/data
+
+# Prefer /sbin/preinit as hybris-boot normally runs this
+[ -e "$rootfs_location/sbin/preinit" ] && init=/sbin/preinit
