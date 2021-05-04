@@ -92,7 +92,8 @@ telnet_pid=$(pgrep telnetd)
 [ "$telnet_pid" ] && kill $telnet_pid
 total="$(df -Ph | awk 'END {print $2}')"
 usage="$(df -P | awk 'END {print $5}')"
-os=" $(get_os_name "$rootfs_location")"
+os="$(get_os_name "$rootfs_location")"
+[ "$os" ] && os=" $os"
 init_log "Booting$os from $rootfs_location ($usage of $total used)..."
 # log kernel messages to boot console again on non-silent boots
 [ "$silent_boot" != "1" ] && setlogcons 0
