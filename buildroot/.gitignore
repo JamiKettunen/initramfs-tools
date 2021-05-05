@@ -7,5 +7,5 @@
 # Concatenated build config
 /external/configs/final_defconfig
 
-# Build artifact
-/rootfs.tar.gz
+# Build artifacts
+/*.tar.gz
