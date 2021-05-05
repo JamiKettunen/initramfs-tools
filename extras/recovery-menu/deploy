@@ -1,0 +1,11 @@
+#!/bin/bash
+recovery_menu_hook="$(hook_get recovery-menu)"
+font="/usr/share/kbd/consolefonts/$RECOVERY_FONT.psf.gz"
+if [ -e "$font" ]; then
+	sed "s/@FONT@/$RECOVERY_FONT/" -i "$recovery_menu_hook"
+	mkdir -p initramfs/fonts
+	cp "$font" initramfs/fonts/
+else
+	warn "The console font file '$RECOVERY_FONT' doesn't exist, skipping..."
+	sed "/font/d" -i "$recovery_menu_hook"
+fi

@@ -31,6 +31,7 @@ A bunch of the initramfs features can be configured via kernel cmdline using the
 |`rd.silent_boot`|`0` (default) or `1`|Silence logs from kernel and initramfs, implied on when splash image set|
 |`rd.no_clear`|`0` (default) or `1`|Don't clear console on initramfs enter|
 |`rd.no_fwdcon`|`0` (default) or `1`|Don't forward kernel messages to `tty8` while starting|
+|`rd.fb_rotation`|`0` (default), `1`, `2` or `3`|Set fbcon rotation for [`recovery-menu`](hooks/59-recovery-menu)|
 
 ## Booting
 * Block device: `rd.rootfs=/dev/sde21`
@@ -89,6 +90,9 @@ USB
 * `CONFIG_USB_CONFIGFS=m` (configure USB via ConfigFS)
 * `CONFIG_USB_CONFIGFS_RNDIS=y` (enable RNDIS access)
 * `CONFIG_USB_CONFIGFS_MASS_STORAGE=y` (enable Mass Storage access)
+
+Recovery menu
+* `CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y` (for custom `rd.fb_rotation` values)
 
 ## Debugging
 If you have a working virtual console, you should have logs visible on the display itself.

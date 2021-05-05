@@ -1,0 +1,686 @@
+#!/bin/sh
+
+# Font setup
+font="@FONT@"
+gunzip /fonts/$font.psf.gz
+loadfont < /fonts/$font.psf
+
+# Runtime vars
+soc="$(sed -n 's/model name\t: //p' /proc/cpuinfo | head -1)"
+[ -z "$soc" ] && soc="$(sed -n 's/Hardware\t: //p' /proc/cpuinfo | head -1)"
+rootfs=$(get_opt rootfs)
+arch="$(uname -m)"
+bat_sysfs="/sys/class/power_supply"
+bat_count=$(ls $bat_sysfs 2>/dev/null | wc -l) # e.g. 1
+tz_sysfs="/sys/class/thermal"
+tz_count=$(ls $tz_sysfs 2>/dev/null | wc -l) # e.g. 20
+fb_rotation_sysfs=/sys/class/graphics/fbcon/rotate
+fb_sysfs=/sys/class/graphics/fb0
+fb_size="$(grep -Eo '[0-9]+x[0-9]+' $fb_sysfs/modes)" # e.g. "1080x2160"
+fb_w=$(cat $fb_sysfs/virtual_size | cut -d'x' -f1) # e.g. 1080
+fb_h=$(cat $fb_sysfs/virtual_size | cut -d'x' -f2) # e.g. 2160
+[ $fb_h -gt $fb_w ] && fb_portrait=1 || fb_portrait=0
+fb_bpp=$(cat $fb_sysfs/bits_per_pixel) # e.g. 32
+fb_driver="$(cat $fb_sysfs/name | sed 's/^simple$/simplefb/')" # e.g. "simplefb" / "..."
+cpufreq_sysfs=/sys/devices/system/cpu/cpufreq
+cpufreq_policy_count=$(ls $cpufreq_sysfs 2>/dev/null | wc -l) # e.g. 2
+[ $cpufreq_policy_count -gt 0 ] && cpufreq_info=" (up to $(echo "scale=2; $(cat $cpufreq_sysfs/policy*/scaling_max_freq | sort -V | tail -1)/1000000" | bc) GHz)"
+bb_ver="$(sh --help 2>&1 | head -1 | awk '{print $2}')"
+br2_ver="$(sed -n 's/VERSION_ID=//p' /etc/os-release)"
+initfs_ver="$(sed -n 's/RD_VERSION=//p' /etc/os-release)"
+display_bl_sysfs=/sys/class/backlight/
+display_bl_count=$(ls $display_bl_sysfs 2>/dev/null | wc -l) # e.g. 1
+if [ $display_bl_count -gt 0 ]; then
+	display_bl_sysfs="$display_bl_sysfs/$(ls $display_bl_sysfs | head -1)"
+	display_bl_max_val=$(cat $display_bl_sysfs/max_brightness) # e.g. 255 / 1023
+	display_bl_sysfs="$display_bl_sysfs/brightness"
+fi
+
+menu_breakout=0
+menu_header_extra=""
+menu_index=0
+menu_index_preserve=0
+menu_selection="> "
+menu_page_max_items=20
+
+r_dbg() { dbg "recovery-menu: $1"; }
+
+# NOTE: "|" and "~" are reserved characters!
+show_menu() {
+	opts="$1"
+	#r_dbg "opts = '$opts'"
+	opts_m="$(echo "$opts" | sed -e 's/ /~/g' -e 's/|/ /g')" # e.g. "A A|B|C C..." -> "A~A B C~C"
+	max_i=$(count_chars "|" "$opts")
+
+	header_extra="$2"
+	r_dbg "show_menu(): $header_extra"
+	if [ "$header_extra" ]; then
+		header_extra=" | $header_extra" # e.g. " | Reboot..."
+		header_extra_len=${#header_extra} # e.g. 12
+		header_under_extra=""
+		for i in $(seq 1 $header_extra_len); do
+			header_under_extra="${header_under_extra}="
+		done
+		header="Initramfs Menu${header_extra}
+==============${header_under_extra}
+"
+	else
+		header="Initramfs Menu
+==============
+"
+	fi
+
+	if [ $menu_index_preserve -eq 1 ]; then
+		i=$menu_index
+		menu_index_preserve=0
+	else
+		i=0
+	fi
+	while true; do
+		tmp_i=0
+		clear
+		echo "$header"
+		[ "$menu_header_extra" ] && echo "   $menu_header_extra
+"
+		for opt in $opts_m; do
+			# TODO: Don't run if no "~" in string
+			opt="$(echo "$opt" | sed -e 's/~/ /g')" # e.g. "A~A" -> "A A"
+			if [ $tmp_i -eq $i ]; then
+				echo "   $menu_selection$opt"
+			else
+				echo "   $opt"
+			fi
+			tmp_i=$((tmp_i+1))
+		done
+		if [ "$menu_selection" ]; then
+			printf "
+Navigate with volume up/down keys & select option with power button..."
+		else
+			printf "
+Press the power button to go back..."
+		fi
+
+		key=$(read-key)
+		case $key in
+			114|108) # vol / arrow down
+				[ $i -lt $max_i ] && i=$((i+1)) || i=0 ;;
+			115|103) # vol / arrow up
+				[ $i -gt 0 ] && i=$((i-1)) || i=$max_i ;;
+			116|28) # power button / enter
+				menu_index=$i; break ;;
+		esac
+	done
+	menu_header_extra=""
+}
+
+# Check if a string ends with another string.
+# $1 = the comparison string
+# $2 = the base string
+endswith() { case $2 in *"$1") true;; *) false;; esac; }
+
+show_paged_menu() {
+	menu_header_extra_paged="$menu_header_extra"
+	menu_page_items="$1"
+	endswith "|" "$menu_page_items" && menu_page_items="${menu_page_items::-1}"
+	pipe_count=$(count_chars "|" "$menu_page_items")
+	menu_page_item_count=$(($pipe_count+1)) # e.g. 7
+	page_header_extra="$2"
+	menu_multipage=0
+	if [ $menu_page_item_count -gt $menu_page_max_items ]; then
+		menu_multipage=1
+		menu_page_items="$(echo "$menu_page_items" | sed -e 's/ /~/g' -e 's/|/ /g')"
+	elif [ $menu_page_item_count -eq 0 ]; then # malformed paged menus
+		return
+	fi
+
+	page_i=0
+	#r_dbg "show_paged_menu(): menu_page_item_count = '$menu_page_item_count'"
+	#r_dbg "show_paged_menu(): menu_page_max_items = '$menu_page_max_items'"
+	# FIXME: This is incorrect when menu_page_item_count == menu_page_max_items!
+	page_max_i=$((menu_page_item_count/(menu_page_max_items+1))) # TODO: Make sure this isn't broken!
+	#r_dbg "show_paged_menu(): page_max_i = '$page_max_i'"
+	while true; do
+		if [ $menu_multipage -eq 1 ]; then # multi page
+			item_start=$((page_i*menu_page_max_items))
+			item_end=$((item_start+menu_page_max_items))
+			page_staging=""
+			tmp_i=-1
+			page_curr_max_i=0
+			for page_item in $menu_page_items; do
+				tmp_i=$((tmp_i+1))
+				[ $tmp_i -lt $item_start ] && continue
+				[ $tmp_i -ge $item_end ] && break
+				page_staging="$page_staging|$page_item"
+				page_curr_max_i=$((page_curr_max_i+1))
+			done
+			#r_dbg "show_paged_menu(): tmp_i = $tmp_i"
+			#r_dbg "show_paged_menu(): page_curr_max_i = $page_curr_max_i"
+		else
+			page_curr_max_i=$menu_page_item_count
+		fi
+
+		if [ $menu_multipage -eq 1 ]; then
+			page="$(echo "${page_staging:1}" | sed -e 's/ /|/g')" # -e 's/~/ /g'
+		else
+			page="$menu_page_items"
+		fi
+
+		[ $page_i -eq 0 ] && page="Back...|$page"
+		[ $page_i -gt 0 ] && page="Previous page|$page"
+		[[ $page_i -lt $page_max_i ]] && page="$page|Next page" # $menu_multipage -eq 1 &&
+		#r_dbg "show_paged_menu(): page = '$page'"
+
+		# (re)set menu_header_extra as it gets lost on page switches
+		[ "$menu_header_extra_paged" ] && menu_header_extra="$menu_header_extra_paged"
+		show_menu "$page" "$page_header_extra"
+		case $menu_index in
+			0) # previous page / back / first item
+				#r_dbg "show_paged_menu(): previous/back/first"
+				if [ $page_i -gt 0 ]; then # previous page
+					page_i=$((page_i-1))
+				else # back
+					menu_index=-1
+					break
+				fi
+				;;
+			$((page_curr_max_i+1))) # next page / last item
+				r_dbg "show_paged_menu(): next/last ($menu_index -> $page_curr_max_i+1)"
+				if [[ $page_i -lt $page_max_i ]]; then
+					page_i=$((page_i+1))
+					r_dbg "show_paged_menu(): next page -> $page_i"
+				else
+					r_dbg "show_paged_menu(): last item"
+				fi
+				;;
+			*)
+				menu_index=$((page_i*menu_page_max_items+menu_index))
+				r_dbg "show_paged_menu(): selected $menu_index"
+				break
+				;;
+		esac
+	done
+	#menu_header_extra_paged=""
+}
+
+# Set menu_header_extra to the fancy rootfs/os string
+set_rootfs_os_header() {
+	if [ "$rootfs_location" ]; then
+		os="$(get_os_name $rootfs_location)"
+		if [ "$os" ]; then
+			menu_header_extra="RootFS: $rootfs
+   OS: ${os:-<unknown>}"
+		else
+			menu_header_extra="RootFS: $rootfs"
+		fi
+	else
+		os=""
+		menu_header_extra="RootFS: ${rootfs:-<none>}"
+	fi
+}
+
+umount_rootfs() {
+	grep -q ' /rootfs ' /proc/mounts && umount /rootfs
+	grep -q ' /rootfs_par ' /proc/mounts && umount /rootfs_par
+	[ -e /dev/nbd0 ] && nbd-client -d /dev/nbd0
+	#rootfs_location=""
+}
+
+rootfs_par_menu() {
+	[ -z "$PARS_MENU" ] && PARS_MENU="$(list_pars)"
+
+	preserved_menu_index=0
+	while true; do
+		set_rootfs_os_header
+		menu_header_extra="$menu_header_extra
+
+   NOTE: Any partitions less than $list_pars_ignore_under_human_readable in size aren't shown!"
+		menu_index=$preserved_menu_index
+		menu_index_preserve=1
+		show_paged_menu "$(echo "$PARS_MENU" | awk '{print}' ORS='|')" "Choose rootfs partition"
+		[ $menu_index -eq -1 ] && break # back...
+
+		rootfs_par="/dev/$(echo "$PARS_MENU" | awk "NR==$menu_index {print}" | cut -d' ' -f1)" # e.g. /dev/sda13
+		old_rootfs="$rootfs"
+
+		rootfs="$rootfs_par"
+		parse_rootfs_par
+		grep -q ' /rootfs_par ' /proc/mounts && umount_rootfs
+		mount_rootfs_par
+		[ $rootfs_mount_error -eq 0 ] && break # rootfs mounted, we're done here
+
+		rootfs="$old_rootfs"
+		preserved_menu_index=$menu_index
+		r_dbg "rootfs_location -> '$rootfs_location'" # TODO: also clear?
+		r_dbg "failed to mount rootfs with error $rootfs_mount_error!"
+		case $rootfs_mount_error in
+			1) menu_header_extra="ERROR: The NBD export '$nbd_export' couldn't be located on
+          $HOST_IP; please check 'nbd-client -l 127.0.0.1' on your host!" ;;
+			2) menu_header_extra="ERROR: The NBD export '$nbd_export' with block size $nbd_bs
+          couldn't be mounted; please try other block sizes!" ;;
+			3) menu_header_extra="ERROR: The rootfs partition $rootfs_par couldn't be mounted!" ;;
+		esac
+		show_menu "Okay" "Choose rootfs partition"
+	done
+}
+
+attempt_rootfs_mount() {
+	parse_rootfs_par
+	grep -q ' /rootfs ' /proc/mounts && umount_rootfs
+	mount_rootfs
+	if [ $rootfs_mount_error -gt 0 ]; then
+		rootfs="$old_rootfs"
+		#preserved_menu_index=$menu_index
+		r_dbg "rootfs_location -> '$rootfs_location'" # TODO: also clear?
+		r_dbg "failed to mount rootfs with error $rootfs_mount_error!"
+		case $rootfs_mount_error in
+			4) menu_header_extra="ERROR: The rootfs '$rootfs_location' couldn't be found!" ;;
+		esac
+		show_menu "Okay" "$menu_title"
+	fi
+}
+
+rootfs_dir_img_menu() {
+	menu_title="Choose rootfs directory/image"
+	if [ -z "$rootfs_par$rootfs" ]; then
+		menu_header_extra="ERROR: Please select a rootfs partition before continuing!"
+		show_menu "Okay" "$menu_title"
+		return
+	fi
+
+	old_rootfs="$rootfs"
+	dir_current="."
+	while true; do
+		dir_listing="$(ls -1a /rootfs_par/$dir_current)"
+		if [ "$dir_current" = "." ]; then
+			dir_listing="$(echo "$dir_listing" | sed -e '/^\.\.$/d')" #  -e '/^lost+found$/d'
+		fi
+		dir_listing_menu="$(echo "$dir_listing" | sed -e 's/^\.$/\. (use this dir as rootfs)/' -e 's/^\.\.$/\.\. (go up one dir)/')"
+		set_rootfs_os_header
+		menu_header_extra="$menu_header_extra
+   Current dir: $dir_current"
+		# TODO: Show only *.img files + directories?
+		# TODO: Hide "Back..." when (dir_current != ".")!
+		# TODO: Show ".." before "."?
+		show_paged_menu "$(echo "$dir_listing_menu" | awk '{print}' ORS='|')" "$menu_title"
+		[ $menu_index -eq -1 ] && break # back...
+
+		path_staging="$(echo "$dir_listing" | awk "NR==$menu_index {print}")"
+		if [ "$path_staging" = "." ]; then # directory
+			[ "$dir_current" = "." ] && rootfs="$rootfs_par" || rootfs="$rootfs_par/$dir_current"
+			# TODO: test if this works!
+			attempt_rootfs_mount
+			[ $rootfs_mount_error -eq 0 ] && break
+		fi
+
+		path_current="$dir_current/$path_staging"
+		path_real="$(readlink -f /rootfs_par/$path_current)"
+		if [ -d "$path_real" ]; then # subdir
+			dir_real_current="${path_real:12}"
+			[ "$dir_real_current" ] && dir_current="$dir_real_current" || dir_current="."
+		else # image
+			# FIXME: selecting with another image chosen doesn't mount this!!!
+			rootfs="$rootfs_par/${path_real:12}"
+			attempt_rootfs_mount
+			[ $rootfs_mount_error -eq 0 ] && break
+		fi
+	done
+}
+
+rootfs_save_menu() {
+	config_par=$(get_cmdline_opt "rd.config")
+	if [ -z "$config_par" ]; then
+		menu_header_extra="ERROR: To save a target rootfs choice you need to set rd.config on
+          kernel cmdline (or set it directly with rd.rootfs)!"
+		show_menu "Okay" "Save target RootFS"
+		return
+	fi
+
+	menu_header_extra="Would you like to save the target rootfs on $config_par/rd.cfg
+   as $rootfs?"
+	show_menu "No|Yes" "Save target RootFS"
+	[ $menu_index -eq 1 ] && update_opt "rootfs" "$rootfs"
+}
+
+rootfs_menu() {
+	# TODO: handle NBD somehow...
+	last_rootfs="$rootfs"
+
+	while true; do
+		[ "$rootfs" ] && rootfs_opt="Change" || rootfs_opt="Set a"
+		set_rootfs_os_header
+		show_menu "Choose rootfs partition|Choose rootfs directory/image|Save...|Back..." "$rootfs_opt rootfs target..."
+		case $menu_index in
+			0) # par
+				rootfs_par_menu ;;
+			1) # dir/img
+				rootfs_dir_img_menu ;;
+			2) # save
+				rootfs_save_menu ;;
+			3) # back
+				break ;;
+		esac
+
+		if [ "$last_rootfs" != "$rootfs" ]; then
+			update_opt "rootfs" "$rootfs" 0
+			last_rootfs="$rootfs"
+		fi
+	done
+}
+
+# Returns human readable size of all detected storage devices (sum).
+get_all_storage() {
+	disks="$(fdisk -l | grep '^Disk /' | cut -d' ' -f2)" # e.g. "/dev/sda:\n/dev/sdb:\n..."
+	total_bytes=0
+	for disk in $disks; do
+		disk_bytes=$(blockdev --getsize64 ${disk::-1}) # e.g. 57940115456
+		total_bytes=$(($total_bytes+$disk_bytes))
+	done
+	echo "$(bytes_to_size $total_bytes)"
+}
+
+# Return a human readable rotation name for the fbcon.
+# $1 = rotation num (0-3)
+get_rotation_name() {
+	[ $fb_portrait -eq 1 ] \
+		&& echo "$(echo $1 | sed -e 's/0/portrait/' -e 's/1/landscape/' -e 's/2/portrait (flipped)/' -e 's/3/landscape (flipped)/')" \
+		|| echo "$(echo $1 | sed -e 's/0/landscape/' -e 's/1/portrait/' -e 's/2/landscape (flipped)/' -e 's/3/portrait (flipped)/')"
+}
+
+info_menu() {
+	menu_selection_backup="$menu_selection" # e.g. "> "
+	menu_selection=""
+	[ $bat_count -gt 0 ] && bat_entry="|Battery: $(cat $bat_sysfs/*/capacity)% ($(cat $bat_sysfs/*/status))"
+	[ "$soc" ] && soc_entry="|SoC:     $soc"
+	[ $tz_count -gt 0 ] && temp="$(echo "scale=1; $(cat $tz_sysfs/*/temp 2>/dev/null | sort | tail -1)/1000" | bc)" # e.g. "33.7"
+	[ "$temp" ] && temp_entry="|Temp:    $temp°C"
+	storage_entry="|Storage: $(get_all_storage)"
+	fb_extra="$(get_rotation_name $(cat $fb_rotation_sysfs))"
+	#r_dbg "info_menu(): os='$os'"
+	show_menu "Device:  $DEVICE_MODEL|Kernel:  $KERNEL_VER|Arch:    $arch${soc_entry}|CPUs:    $NPROC${cpufreq_info}|RAM:     $MEM${storage_entry}${temp_entry}${bat_entry}|Display: ${fb_size}x${fb_bpp} ($fb_driver, $fb_extra)| |RootFS:    ${rootfs:-<none>}|OS:        ${os:-<unknown>}|BusyBox:   $bb_ver|Buildroot: $br2_ver|Initramfs: $initfs_ver" "Device info"
+	menu_selection="$menu_selection_backup"
+}
+
+# Misc menu
+############
+
+fb_rotate_menu() {
+	if [ -z "$rotate_opts" ]; then
+		rotate_opts="$(get_rotation_name 0)|$(get_rotation_name 1)|$(get_rotation_name 2)|$(get_rotation_name 3)"
+	fi
+	menu_index=0
+	while true; do
+		menu_header_extra="Current rotation: $(get_rotation_name $(cat $fb_rotation_sysfs))"
+		menu_index_preserve=1
+		show_menu "$rotate_opts|Back..." "Change display rotation"
+		case $menu_index in
+			0|1|2|3) # rotations
+				echo $menu_index > $fb_rotation_sysfs
+				;;
+			4) # back
+				break ;;
+		esac
+	done
+}
+
+# Return an integer percentage value representing $1 amount of $2
+values_to_percentage() {
+	awk -- 'BEGIN{printf "%d\n", ARGV[1]/ARGV[2]*100}' $1 $2
+}
+
+# Return an integer value representing a $1% of $2 maximum
+percentage_to_value() {
+	# This is intentionally 99 instead of 100 as it appears to give "more accurate"
+	# values in return, could definitely be improbed in display_backlight_menu() itself...
+	awk -- 'BEGIN{printf "%d\n", ARGV[2]/99*ARGV[1]}' $1 $2
+}
+
+display_backlight_menu() {
+	if [ $display_bl_count -lt 1 ]; then
+		menu_header_extra="ERROR: No display backlight sysfs control file found!"
+		show_menu "Okay" "Change display brightness"
+		return
+	fi
+
+	menu_index=0
+	while true; do
+		bl_curr_val=$(cat $display_bl_sysfs) # e.g. 255 / 1023
+		bl_curr_percentage=$(values_to_percentage $bl_curr_val $display_bl_max_val) # e.g. "50"
+
+		menu_header_extra="Current brightness: $bl_curr_percentage% ($bl_curr_val)"
+		menu_index_preserve=1
+		show_menu "0%|-5%|+5%|100%|Back..." "Change display brightness"
+		case $menu_index in
+			0) # 0%
+				echo 0 > $display_bl_sysfs ;;
+			1) # -5%
+				bl_new_percentage=$((bl_curr_percentage-5)) # e.g. 45
+				if [ $bl_new_percentage -ge 0 ]; then
+					echo $(percentage_to_value $bl_new_percentage $display_bl_max_val) > $display_bl_sysfs
+				else
+					echo 0 > $display_bl_sysfs
+				fi
+				;;
+			2) # +5%
+				bl_new_percentage=$((bl_curr_percentage+5)) # e.g. 55
+				if [ $bl_new_percentage -le 100 ]; then
+					echo $(percentage_to_value $bl_new_percentage $display_bl_max_val) > $display_bl_sysfs
+				else
+					echo $display_bl_max_val > $display_bl_sysfs
+				fi
+				;;
+			3) # 100%
+				echo $display_bl_max_val > $display_bl_sysfs ;;
+			4) # back
+				break ;;
+		esac
+	done
+}
+
+misc_menu() {
+	while true; do
+		show_menu "Change display rotation|Change display brightness|Drop to shell (ash)|Back..." "Miscellaneous options"
+		case $menu_index in
+			0) # display orientation
+				fb_rotate_menu
+				;;
+			1) # display brightness
+				display_backlight_menu
+				;;
+			2) # shell (ash)
+				sleep 0.33 # attempt avoiding garbage input from power button press
+				clear
+				echo "Dropping to ash shell, feel free to 'exit' when done!
+"
+				shell
+				break # back to main menu
+				;;
+			3) # back
+				break ;;
+		esac
+	done
+}
+
+# Reboot menu
+##############
+
+reboot_menu() {
+	show_menu "Reboot normally|Reboot to bootloader|Reboot to TWRP recovery|Shut down|Back..." "Reboot..."
+	case $menu_index in
+		0) # normal
+			sync && reboot -f ;;
+		1) # bootloader
+			reboot-mode bootloader ;;
+		2) # recovery
+			reboot-mode recovery ;;
+		3) # shut down
+			sync && poweroff -f ;;
+		4) # back
+			return ;;
+	esac
+	read # "hang" until rebooted (should be instant)
+}
+
+# USB gadget menu
+##################
+
+kill_and_wait() {
+	proc="$1" # e.g. "telnetd"
+	pid=$(pgrep "$proc")
+	while [ "$pid" ]; do
+		kill $pid 2>&1 > /dev/null
+		sleep 0.1
+		pid=$(pgrep "$proc")
+	done
+}
+
+usb_gadget=/config/usb_gadget/g1
+usb_funcs=$usb_gadget/functions
+usb_config=$usb_gadget/configs/c.1
+usb_f_ms="mass_storage.0"
+usb_f_rndis="rndis.usb0"
+usb_gadget_menu() {
+	(hook_exists telnetd && hook_exists rndis) || telnet_opt_extra=" (unavailable)"
+	hook_exists mass-storage || ms_opt_extra=" (unavailable)"
+	[ "$(get_opt mass_storage_rw)" = "1" ] && ms_ro="" || ms_ro=" (read-only)"
+
+	menu_index=0
+	while true; do
+		[ -e $usb_config/$usb_f_rndis ] && telnet_opt="Disable" || telnet_opt="Enable"
+		[ -e $usb_config/$usb_f_ms ] && ms_opt="Disable" || ms_opt="Enable"
+
+		usb_active_funcs=""
+		[ "$telnet_opt" = "Disable" ] && usb_active_funcs="Telnet (RNDIS)"
+		[ "$ms_opt" = "Disable" ] && usb_active_funcs="$usb_active_funcs + Mass Storage"
+		[ "${usb_active_funcs:0:2}" = " +" ] && usb_active_funcs="${usb_active_funcs:3}"
+
+		menu_header_extra="Current active functions: ${usb_active_funcs:-None}"
+		menu_index_preserve=1
+		# FIXME: enabling ms disables rndis!
+		show_menu "$telnet_opt telnet access$telnet_opt_extra|$ms_opt mass storage access${ms_opt_extra:-$ms_ro}|Back..." "Configure USB gadget..."
+		case $menu_index in
+			0) # telnet
+				if [ "$telnet_opt_extra" ]; then
+					menu_header_extra="ERROR: Telnet access is unavailable due to a missing rndis/telnetd hooks!"
+					show_menu "Okay" "Configure USB gadget..."
+					continue
+				fi
+
+				if [ "$telnet_opt" = "Enable" ]; then
+					hook_exec rndis
+					if [ ! -e $usb_funcs/$usb_f_rndis ]; then
+						menu_header_extra="ERROR: No rndis ConfigFS gadget function was found!"
+						show_menu "Okay" "Configure USB gadget..."
+						continue
+					fi
+					toggle-rndis on keep
+					hook_exec telnetd
+				else # Disable
+					toggle-rndis off keep
+					kill_and_wait telnetd
+				fi
+				;;
+			1) # mass storage
+				if [ "$ms_opt_extra" ]; then
+					menu_header_extra="ERROR: Telnet access is unavailable due to a missing rndis/telnetd hooks!"
+					show_menu "Okay" "Configure USB gadget..."
+					continue
+				fi
+
+				if [ "$ms_opt" = "Enable" ]; then
+					hook_exec mass-storage
+					if [ ! -e $usb_funcs/$usb_f_ms ]; then
+						menu_header_extra="ERROR: No mass_storage ConfigFS gadget function was found!"
+						show_menu "Okay" "Configure USB gadget..."
+						continue
+					fi
+					if [ ! -e $usb_config/$usb_f_ms ]; then
+						toggle-mass-storage on keep
+					else
+						# occurs if enabled before rndis
+						log "usb_gadget_menu(): not running toggle-mass-storage as it was already on!"
+					fi
+					#sleep 10
+				else # Disable
+					toggle-mass-storage off keep
+				fi
+				;;
+			2) # back
+				break ;;
+		esac
+	done
+}
+
+# Main menu
+############
+
+main_menu() {
+	set_rootfs_os_header
+	r_dbg "info_menu(): os='$os'"
+	if [ "$main_menu_header_extra" ]; then # custom one-time "welcome" messages
+		menu_header_extra="$main_menu_header_extra"
+		main_menu_header_extra=""
+		# TODO: Don't allow continuing boot since it's broken!
+	fi
+
+	if [ "$rootfs" ]; then
+		boot_opt="Continue booting|"
+		rootfs_opt="Change"
+	else
+		boot_opt=""
+		rootfs_opt="Set a"
+	fi
+	hook_exists configfs || gadget_opt_extra=" (unavailable)"
+
+	show_menu "${boot_opt}$rootfs_opt rootfs target|Show device info|Configure USB gadget...$gadget_opt_extra|View /init.log|Miscellaneous options|Reboot..."
+	[ -z "$rootfs" ] && menu_index=$((menu_index+1)) # skip over boot option
+	case $menu_index in
+		0) # continue boot
+			menu_breakout=1 ;;
+		1) # choose rootfs
+			rootfs_menu ;;
+		2) # info
+			info_menu ;;
+		3) # usb gadget
+			if [ "$gadget_opt_extra" ]; then
+				menu_header_extra="ERROR: This menu is unavailable due to a missing configfs hook!"
+				show_menu "Okay" "Configure USB gadget..."
+				continue
+			fi
+			usb_gadget_menu
+			;;
+		4) # view init.log
+			# TODO: Incorporate fold -> RECOVERY_FOLD_WIDTH
+			log_contents="$(cat /init.log)"
+			show_paged_menu "$(echo "$log_contents" | awk '{print}' ORS='|')" "View /init.log"
+			;;
+		5) # miscellaneous
+			misc_menu ;;
+		6) # reboot
+			reboot_menu ;;
+	esac
+}
+
+fb_rotation=$(get_opt fb_rotation) # e.g. [0-3]
+if [ "$fb_rotation" ]; then
+	# NOTE: this file should still exists even if FRAMEBUFFER_CONSOLE_ROTATION is disabled, find another way...
+	echo $fb_rotation > $fb_rotation_sysfs \
+		|| dbg "recovery-menu: fb_rotation defined but fbcon rotation not supported by kernel, ignoring..."
+fi
+
+if [ "$rootfs" ]; then # called from e.g. hang()
+	parse_rootfs_par
+	mount_rootfs
+	[ $rootfs_mount_error -gt 0 ] && r_dbg "failed to mount rootfs with error $rootfs_mount_error!"
+fi
+
+while [ $menu_breakout -eq 0 ]; do
+	main_menu
+done
+
+# reset rotation
+[[ "$fb_rotation" && -e $fb_rotation_sysfs ]] && echo 0 > $fb_rotation_sysfs
+
+clear
+log "Continuing boot process..."
+#umount_rootfs
+#sleep 1

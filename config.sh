@@ -47,7 +47,7 @@ HOOKS_ENABLE=()
 # choices: see hooks/* & hooks/late/*
 HOOKS_EXTRA=(
 	configfs rndis mass-storage # USB gadget
-	telnetd hang late/hang # Debugging
+	telnetd debugfs recovery-menu hang late/hang # Debugging
 )
 
 # Kernel modules to copy over
@@ -140,6 +140,10 @@ BOOT_OF=true
 #       has been in place since kernel v4.3!
 # e.g. (sde21 sda13 sde19)
 MASS_STORAGE_KNOWN_PARTITIONS=()
+
+# This will used by recovery-menu and is copied from the host /usr/share/kbd/consolefonts/*.psf.gz
+# default: "ter-128b" (provided by terminus-font on Arch Linux)
+RECOVERY_FONT="ter-128b"
 
 # Run the build scripts without any interactive prompts; great for e.g. scripting
 # Can also be enabled via -N arg for the build scripts

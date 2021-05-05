@@ -207,6 +207,7 @@ setup_hooks() {
 	done
 	hook_present "telnetd" || sed '/telnet_pid/d' -i initramfs/init
 	hook_present "msm-fb-refresher" || rm -f initramfs/usr/bin/msm-fb-refresher
+	hook_present "recovery-menu" || rm -f initramfs/usr/bin/read-key
 
 	rmdir initramfs/hooks/late 2>/dev/null && rmdir initramfs/hooks 2>/dev/null || :
 	rm -f initramfs/deploy # in case any extras/*/deploy scripts were run
