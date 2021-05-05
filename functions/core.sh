@@ -26,6 +26,9 @@ dbg_kmsg() {
 	echo "<${2:-6}>initrd: $1" > /dev/kmsg
 }
 
+# Append a command's stderr into /init.log
+dbg_err() { $@ 2>&1 | tee -a /init.log; }
+
 # Hooks
 ########
 

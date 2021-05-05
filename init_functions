@@ -22,12 +22,23 @@ hang() {
 	[ "$1" ] && log_kmsg "$1" "$2"
 	mount | grep -q /rootfs_par && sh -c "sleep 2; cp /init.log /rootfs_par/; sync" &
 
-	hook_exec configfs
-	hook_exec rndis
-	hook_exec telnetd
+	if hook_exists recovery-menu; then
+		log "Recovery menu available, launching in 5 seconds..."
+		sleep 5
+		if [ "$1" ]; then
+			main_menu_header_extra="$1"
+		else
+			main_menu_header_extra="Uh oh, something appears to have gone wrong; check /init.log for details!"
+		fi
+		hook_exec recovery-menu
+	else
+		hook_exec configfs
+		hook_exec rndis
+		hook_exec telnetd
 
-	log "@HANG_MSG@"
-	@HANG_CMD@
+		log "@HANG_MSG@"
+		@HANG_CMD@
+	fi
 }
 
 # Used in case rd.rootfs not defined OR if $rootfs_par not found within 10 seconds
