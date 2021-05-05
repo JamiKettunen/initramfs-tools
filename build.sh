@@ -224,8 +224,8 @@ create_cpio() {
 	fi
 
 	if [[ "$CPIO_COMPRESS" = "gz"* ]]; then
-		compress_cmd="gzip --best"
-		[ $CPIO_COMPRESS_KEEP_SRC -eq 1 ] && compress_cmd+=" --keep"
+		compress_cmd="gzip --best --no-name"
+		[ $CPIO_COMPRESS_KEEP_SRC -eq 1 ] && compress_cmd+=" --keep" || compress_cmd+=" --force"
 		compress_ext=".gz"
 	elif [[ "$CPIO_COMPRESS" = "lz4"* ]]; then
 		compress_cmd="lz4 -l --best --favor-decSpeed --quiet -m"
