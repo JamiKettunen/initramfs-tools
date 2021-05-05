@@ -162,6 +162,7 @@ setup_hooks() {
 		modules_to_probe="${KERNEL_MODULES_PROBE[@]}"
 		sed "s/@KERNEL_MODULES_PROBE@/$modules_to_probe/" -i initramfs/hooks/*load-modules
 	fi
+	hook_present "telnetd" || sed '/telnet_pid/d' -i initramfs/init
 	if hook_present "msm-fb-refresher"; then
 		if [ $BOOT_FB_REFRESHER_TIMEOUT -gt 0 ]; then
 			sed "s/@FB_REFRESHER_TIMEOUT@/$BOOT_FB_REFRESHER_TIMEOUT/" -i initramfs/hooks/*msm-fb-refresher
