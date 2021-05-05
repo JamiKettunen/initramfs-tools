@@ -95,6 +95,10 @@ CPIO_COMPRESS_KEEP_SRC=0
 # e.g. "" (default) or "/dev/sde21"
 BOOT_DEFAULT_TARGET=""
 
+# Enable support for external rd.cfg files?
+# choices: 1 (default) / 0
+BOOT_CONFIG=1
+
 # Path to a (optionally pre-gzipped) PPM image file to show on the framebuffer when booting;
 # if this is a directory (or pre-gzipped tar archive) look for PPM animation frames to cycle
 # through during boot

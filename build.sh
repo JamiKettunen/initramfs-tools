@@ -233,6 +233,10 @@ setup_misc() {
 	else
 		sed -e '/^@ROOTFS_DEFAULT_INIT@$/d' -i initramfs/init
 	fi
+	if [ $BOOT_CONFIG -ne 1 ]; then
+		sed '/^setup_rd_config/d' -i initramfs/init
+		rm -f initramfs/functions/cfg.sh
+	fi
 	if $BOOT_OF; then
 		sed -e 's|@DEVICE_MODEL_SYSFS@|/sys/firmware/devicetree/base/model|' -i initramfs/init
 	else

@@ -4,6 +4,7 @@ export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 . init_functions
 
 mount_proc_sys_dev
+setup_rd_config
 # forward kernel messages to tty8 to avoid module loading spam etc.
 no_fwdcon=$(get_opt no_fwdcon)
 [ "$no_fwdcon" != "1" ] && setlogcons 8
