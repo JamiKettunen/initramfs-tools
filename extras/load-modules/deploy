@@ -1,0 +1,3 @@
+#!/bin/bash
+modules_to_probe="${KERNEL_MODULES_PROBE[@]}"
+sed "s/@KERNEL_MODULES_PROBE@/$modules_to_probe/" -i "$(hook_get load-modules)"

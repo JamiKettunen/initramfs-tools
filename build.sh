@@ -11,9 +11,9 @@ cd "$BASEDIR"
 # Functions
 #############
 log() { echo ">> $1"; }
-warn() { echo "WARN: $1"; }
+warn() { echo "WARN: $1" >&2; }
 err() {
-	echo "ERROR: $1"
+	echo "ERROR: $1" >&2
 	rm -rf initramfs/
 	exit 1
 }
@@ -114,6 +114,19 @@ setup_kmodules() {
 	fi
 }
 hook_present() { item_in_array "$1" "${HOOKS_ENABLE[@]}" "${HOOKS_EXTRA[@]}"; }
+hook_get() {
+	hook_matches="$(find initramfs/hooks -type f 2>/dev/null | grep "$1")"
+	[ -z "$hook_matches" ] && return # none found
+
+	hooks_count=$(echo "$hook_matches" | wc -l)
+	if [ $hooks_count -eq 1 ]; then
+		echo "$hook_matches"
+	else
+		warn "More than one match for hook '$1' found, returning first of:"
+		echo "$hook_matches" >&2
+		echo "$hook_matches" | head -1
+	fi
+}
 setup_hooks() {
 	cp -r {hooks,functions} initramfs/
 	enabled_hooks="${HOOKS_ENABLE[@]}"
@@ -158,20 +171,9 @@ setup_hooks() {
 			mv "$hook_file" "$extra_dir"
 		fi
 	done
-	if hook_present "load-modules"; then
-		modules_to_probe="${KERNEL_MODULES_PROBE[@]}"
-		sed "s/@KERNEL_MODULES_PROBE@/$modules_to_probe/" -i initramfs/hooks/*load-modules
-	fi
 	hook_present "telnetd" || sed '/telnet_pid/d' -i initramfs/init
-	if hook_present "msm-fb-refresher"; then
-		if [ $BOOT_FB_REFRESHER_TIMEOUT -gt 0 ]; then
-			sed "s/@FB_REFRESHER_TIMEOUT@/$BOOT_FB_REFRESHER_TIMEOUT/" -i initramfs/hooks/*msm-fb-refresher
-		else
-			sed "s/^timeout @FB_REFRESHER_TIMEOUT@ //" -i initramfs/hooks/*msm-fb-refresher
-		fi
-	else
-		rm initramfs/usr/bin/msm-fb-refresher
-	fi
+	hook_present "msm-fb-refresher" || rm initramfs/usr/bin/msm-fb-refresher
+
 	rmdir initramfs/hooks/late 2>/dev/null && rmdir initramfs/hooks 2>/dev/null || :
 	rm -f initramfs/deploy # in case any extras/*/deploy scripts were run
 }
