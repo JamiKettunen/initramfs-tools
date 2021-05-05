@@ -25,6 +25,7 @@ A bunch of the initramfs features can be configured via kernel cmdline using the
 |Option|Example values|Comment|
 |------|--------------|-------|
 |`rd.rootfs`|`/dev/sde21`, `nbd:rootfs:512`|Rootfs location (mandatory!)|
+|`rd.config`|`/dev/sda13`|Partition for initramfs user `rd.cfg` (optional)|
 |`rd.extra_hooks`|`late/extra-hook`, `a,b,c`|Additional hooks to run in initramfs|
 |`rd.mass_storage_rw`|`0` (default) or `1`|Mount all mass storage devices as read-write|
 |`rd.silent_boot`|`0` (default) or `1`|Silence logs from kernel and initramfs, implied on when splash image set|

@@ -217,6 +217,10 @@ setup_misc() {
 			-e 's/@HANG_CMD@/sleep infinity/' \
 			-i initramfs/init_functions
 	fi
+	if [ $BOOT_CONFIG -ne 1 ]; then
+		sed '/^setup_rd_config/d' -i initramfs/init
+		rm -f initramfs/functions/cfg.sh
+	fi
 	sed -e "s/@USB_IFACE@/$BOOT_RNDIS_IFACE/" -i initramfs/init
 
 	# add initramfs revision info to /etc/os-release
