@@ -38,6 +38,7 @@ BR2_PACKAGE_BUSYBOX_CONFIG="$(TOPDIR)/../busybox_debug.config"
 
 # Custom external packages
 BR2_PACKAGE_REBOOT_MODE=y
+BR2_PACKAGE_READ_KEY=y
 BR2_PACKAGE_MSM_FB_REFRESHER=y
 
 # Filesystem images

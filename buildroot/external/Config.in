@@ -1,3 +1,4 @@
 source "$BR2_EXTERNAL_initramfs_extras_PATH/package/msm-fb-refresher/Config.in"
 source "$BR2_EXTERNAL_initramfs_extras_PATH/package/parse-android-dynparts/Config.in"
+source "$BR2_EXTERNAL_initramfs_extras_PATH/package/read-key/Config.in"
 source "$BR2_EXTERNAL_initramfs_extras_PATH/package/reboot-mode/Config.in"
