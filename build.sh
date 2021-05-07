@@ -25,9 +25,11 @@ setup_br2() {
 		BR2_SKIP_BUILD=0
 	fi
 
-	[ $BR2_SKIP_BUILD -eq 0 ] \
-		&& bash -c "$BASEDIR/buildroot/build.sh" \
-		|| log "Skipping Buildroot tarball rebuild..."
+	if [ $BR2_SKIP_BUILD -eq 0 ]; then
+		bash -c "$BASEDIR/buildroot/build.sh"
+	else
+		log "Skipping Buildroot tarball rebuild..."
+	fi
 
 	[ -e "$BR2_TARBALL" ] || err "Buildroot tarball '$BR2_TARBALL' doesn't exist!"
 }
@@ -226,11 +228,11 @@ create_cpio() {
 	fi
 
 	if [[ "$CPIO_COMPRESS" = "gz"* ]]; then
-		compress_cmd="gzip --best --no-name"
+		compress_cmd="gzip ${CPIO_COMPRESS_ARGS:---best --no-name}"
 		[ $CPIO_COMPRESS_KEEP_SRC -eq 1 ] && compress_cmd+=" --keep" || compress_cmd+=" --force"
 		compress_ext=".gz"
 	elif [[ "$CPIO_COMPRESS" = "lz4"* ]]; then
-		compress_cmd="lz4 -l --best --favor-decSpeed --quiet -m"
+		compress_cmd="lz4 ${CPIO_COMPRESS_ARGS:--l -9 --favor-decSpeed --quiet}"
 		# FIXME: "lz4 --rm" doesn't appear to delete the source file?
 		[ $CPIO_COMPRESS_KEEP_SRC -ne 1 ] && compress_cmd+=" --rm"
 		compress_ext=".lz4"

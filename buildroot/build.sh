@@ -31,7 +31,7 @@ fi
 cd buildroot-git
 if [ $pull_ask -eq 1 ]; then
 	read -erp ">> Pull updates to buildroot tree (Y/n)? " ans
-	[[ "${ans^^}" != "N"* ]] && git pull
+	[[ "${ans^^}" != "N"* ]] && git pull --ff-only
 fi
 
 patch_count=$(find "$BASEDIR"/patches -type f | wc -l)

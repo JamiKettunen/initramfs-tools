@@ -71,6 +71,12 @@ CPIO_RM_EXISTING=1
 # choices: gz / lz4 (default) / none
 CPIO_COMPRESS="lz4"
 
+# Optionally define custom args for the gzip/lz4 compressor;
+# gzip default: "--best --no-name"
+# lz4 default: "-l -9 --favor-decSpeed --quiet"
+# empty = use defaults
+CPIO_COMPRESS_ARGS=""
+
 # Should the uncompressed source initramfs cpio be kept?
 # choices: 1 / 0 (default)
 CPIO_COMPRESS_KEEP_SRC=0
@@ -92,4 +98,4 @@ BOOT_RNDIS_IFACE="usb0"
 BOOT_FB_REFRESHER_TIMEOUT=5
 
 # Potential local config overrides
-[ -e config.custom.sh ] && . config.custom.sh
+[ -e config.custom.sh ] && . config.custom.sh || :
