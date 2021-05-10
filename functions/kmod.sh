@@ -8,7 +8,7 @@ fi
 load_module() {
 	[ -d "/lib/modules/$KERNEL_VER" ] || return
 	if grep -q "/$1.ko" /lib/modules/$KERNEL_VER/modules.dep; then
-		lsmod | grep $1 || modprobe $@
+		lsmod | grep -q $1 || modprobe $@
 	else
 		dbg "load_module(): $1 not found in modules.dep! assuming built-in..."
 	fi
@@ -17,7 +17,7 @@ load_module() {
 unload_module() {
 	[ -d "/lib/modules/$KERNEL_VER" ] || return
 	if grep -q "/$1.ko" /lib/modules/$KERNEL_VER/modules.dep; then
-		lsmod | grep $1 && modprobe -r $@
+		lsmod | grep -q $1 && modprobe -r $@
 	else
 		dbg "unload_module(): $1 not found in modules.dep! assuming built-in..."
 	fi
