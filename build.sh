@@ -203,6 +203,27 @@ setup_misc() {
 			-i initramfs/init_functions
 	fi
 	sed -e "s/@USB_IFACE@/$BOOT_RNDIS_IFACE/" -i initramfs/init
+
+	# add initramfs revision info to /etc/os-release
+	git_hash="$(git rev-parse --short HEAD 2>/dev/null || :)" # e.g. "c2f1a3b"
+	# date of either latest commit or current time on dirty trees
+	if git diff --quiet; then # clean
+		git_date="$(git log -1 --format="%at" | xargs -I{} date -d @{} +'%Y/%m/%d %H:%M:%S')"
+	else # dirty
+		git_date="$(date +'%Y/%m/%d %H:%M:%S')"
+		git_hash+="+"
+	fi
+	git_branch="$(git symbolic-ref --short HEAD 2>/dev/null || :)" # e.g. "master"
+	if [ "$git_branch" ]; then # regular clones
+		rd_version="$git_hash on $git_branch @ $git_date"
+	elif [ "$git_hash" ]; then # shallow clones without branch
+		rd_version="$git_hash @ $git_date"
+	else # tarball sources etc.
+		rd_version="$git_date"
+	fi
+	log "Setting initramfs version to '$rd_version'..."
+	echo "RD_VERSION=\"$rd_version\"" >> initramfs/etc/os-release
+
 	# remove placeholder files for previously empty directories
 	find initramfs/ -type f -name ".keep" -delete
 }
