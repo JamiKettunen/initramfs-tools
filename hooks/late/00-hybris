@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# Bind-mount userdata over to /data on the rootfs
-droid_data="$rootfs_location/data"
-[ -e "$droid_data" ] || mkdir "$droid_data"
-mount --bind $rootfs_par "$droid_data"
+# OP5: Stop bind-mounting userdata to /data due to it causing (SELinux context) breakages
+#      on Android side -> mount it to /data/android with a userspace systemd unit instead
+droid_data="$rootfs_location/data/android"
+[ -e "$droid_data" ] || mkdir -p "$droid_data"
 
 # Prefer /sbin/preinit as hybris-boot normally runs this
 [ -e "$rootfs_location/sbin/preinit" ] && init="$rootfs_location/sbin/preinit"
