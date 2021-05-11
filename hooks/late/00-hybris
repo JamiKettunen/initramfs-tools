@@ -5,4 +5,4 @@
 mount --bind $rootfs_par "$rootfs_location/data"
 
 # Prefer /sbin/preinit as hybris-boot normally runs this
-[ -e "$rootfs_location/sbin/preinit" ] && init="/sbin/preinit"
+[ -e "$rootfs_location/sbin/preinit" ] && init="$rootfs_location/sbin/preinit"

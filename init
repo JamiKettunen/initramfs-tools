@@ -74,10 +74,13 @@ if [ $rootfs_mount_error -gt 0 ]; then
 fi
 init_log "Rootfs type is $rootfs_type"
 
+init="$rootfs_location/sbin/init"
+# Workaround for broken /sbin/init absolute symlink as seen on e.g. Droidian
+[[ ! -e "$init" && -L "$init" ]] \
+	&& init="$(readlink_hack "$init" "$rootfs_location")"
 # Make sure we've got a valid rootfs with /sbin/init
-init=/sbin/init
-if [ ! -e "$rootfs_location$init" ]; then
-	log_kmsg "ERROR: Couldn't locate $init under '$rootfs_location'! Here's an 'ls -lA':" 2
+if [ ! -e "$init" ]; then
+	log_kmsg "ERROR: Couldn't locate $(real_init) under '$rootfs_location'! Here's an 'ls -lA':" 2
 	ls -lA "$rootfs_location" | tee -a /init.log /dev/kmsg
 	hang
 fi
@@ -100,5 +103,5 @@ init_log "Booting$os from $rootfs_location ($usage of $total used)..."
 # silence some distros complaining about a missing /dev/console (e.g. void)
 [ ! -e "$rootfs_location"/dev/console ] \
 	&& mknod "$rootfs_location"/dev/console c 5 1
-exec switch_root "$rootfs_location" $init
+exec switch_root "$rootfs_location" "$(real_init)"
 hang "Failed to switch root :(" 2

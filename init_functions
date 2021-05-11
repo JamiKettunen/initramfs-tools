@@ -119,3 +119,6 @@ wait_for_rootfs_par() {
 		list_pars_and_hang
 	fi
 }
+
+# Return $init with $rootfs_location stripped from beginning
+real_init() { echo "${init:${#rootfs_location}}"; }
