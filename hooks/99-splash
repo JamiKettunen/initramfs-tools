@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Show boot splash after potential display modules loaded etc;
+# this job runs in the background so the boot process itself isn't slowed down or halted
+timeout @FB_UPDATE_TIMEOUT@ boot-splash &

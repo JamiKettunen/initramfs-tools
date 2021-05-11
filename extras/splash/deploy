@@ -1,0 +1,103 @@
+#!/bin/bash
+splash_hook="$(hook_get splash)"
+splash_sh="initramfs/usr/bin/boot-splash"
+
+splash_warn() { warn "$1, skipping..."; }
+setup_splash_img() {
+	log "Setting boot splash image to '$BOOT_SPLASH'..."
+	splash_file="$(readlink -f "$BOOT_SPLASH")"
+	type="$(file "$BOOT_SPLASH")"
+	if [[ "$type" != *"gzip compressed data"* ]]; then
+		if [[ "$type" != *"Netpbm image data"* ]]; then
+			splash_warn "The splash image file isn't a valid Netpbm image"; return
+		fi
+		gzip -nc "$splash_file" > initramfs/splash.ppm.gz
+	else
+		cp "$splash_file" initramfs/splash.ppm.gz
+	fi
+}
+setup_splash_animation() {
+	log "Setting up boot animation from '$BOOT_SPLASH'..."
+	mkdir -p initramfs/animation
+	if [[ "$BOOT_SPLASH" = *.tar.gz ]]; then
+		tar -xf "$BOOT_SPLASH" -C initramfs/animation/
+		set -- $(ls initramfs/animation/*.ppm | sort -V)
+	else
+		set -- $(ls "$BOOT_SPLASH"/*.ppm* | sort -V)
+	fi
+	if [ -z "$1" ]; then
+		splash_warn "No PPM animation frames found"; return
+	fi
+
+	i=-1
+	for frame in $@; do
+		i=$((i+1))
+		target="initramfs/animation/$i.ppm"
+		if [ ! -e $target ]; then
+			[[ "$frame" = *.gz ]] \
+				&& gunzip -dc "$frame" > $target \
+				|| cp "$frame" $target
+		fi
+		if [ $i -eq 0 ]; then
+			gzip -nc "$target" > initramfs/splash.ppm.gz
+			rm "$target"
+		fi
+	done
+	tar -cf initramfs/animation.tar -C initramfs/animation/ .
+	gzip --best initramfs/animation.tar
+}
+add_if_set() { for opt in $@; do [ "${!opt}" ] && all_opts+="$opt=${!opt}\n" || :; done; }
+setup_splash_specs() {
+	[ -z "$BOOT_SPLASH_SPECS" ] && return # no config tweaks
+
+	static_res="$(gunzip -c initramfs/splash.ppm.gz | identify -format '%wx%h' -)" # "1080x2160"
+	static_res_w=$(echo "$static_res" | cut -d'x' -f1) # e.g. 1080
+	static_res_h=$(echo "$static_res" | cut -d'x' -f2) # e.g. 2160
+	if [ -e initramfs/animation/1.ppm ]; then
+		anim_res="$(identify -format '%wx%h' initramfs/animation/1.ppm)" # "1080x2160"
+		anim_res_w=$(echo "$anim_res" | cut -d'x' -f1) # e.g. 1080
+		anim_res_h=$(echo "$anim_res" | cut -d'x' -f2) # e.g. 2160
+	fi
+
+	if [[ "$BOOT_SPLASH_SPECS" = *"|"* ]]; then
+		static_specs="$(echo "$BOOT_SPLASH_SPECS" | awk -F'|' '{print $1}')"
+		anim_specs="$(echo "$BOOT_SPLASH_SPECS" | awk -F'|' '{print $2}')"
+		anim_center="$(echo "$anim_specs" | awk -F',' '{print $1}')" # e.g. 1|0
+		anim_offset_top="$(echo "$anim_specs" | awk -F',' '{print $2}')"
+		anim_offset_left="$(echo "$anim_specs" | awk -F',' '{print $3}')"
+	else
+		static_specs="$BOOT_SPLASH_SPECS"
+	fi
+	static_center="$(echo "$static_specs" | awk -F',' '{print $1}')" # e.g. 1|0
+	static_offset_top="$(echo "$static_specs" | awk -F',' '{print $2}')"
+	static_offset_left="$(echo "$static_specs" | awk -F',' '{print $3}')"
+
+	add_if_set static_res_w static_res_h anim_res_w anim_res_h static_center static_offset_top static_offset_left anim_center anim_offset_top anim_offset_left
+	echo -e "${all_opts::-2}" > initramfs/etc/fbsplash_custom.cfg
+}
+
+# Fill in placeholders
+if [ $BOOT_FB_UPDATE_TIMEOUT -gt 0 ]; then
+	sed "s/@FB_UPDATE_TIMEOUT@/$BOOT_FB_UPDATE_TIMEOUT/" -i "$splash_hook"
+else
+	sed "s/^timeout @FB_UPDATE_TIMEOUT@ //" -i "$splash_hook"
+fi
+if [ $BOOT_ANIMATION_INTERVAL -gt 0 ]; then
+	sleep_interval="$(awk -- 'BEGIN {printf "%.3f\n", ARGV[1]/1000}' $BOOT_ANIMATION_INTERVAL)"
+	sleep_interval="${sleep_interval%.000}"
+	sed "s/@ANIMATION_INTERVAL@/$sleep_interval/g" -i $splash_sh
+else
+	sed "/sleep @ANIMATION_INTERVAL@/d" -i $splash_sh
+fi
+
+if [ -z "$BOOT_SPLASH" ]; then
+	splash_warn "The splash hook was enabled without BOOT_SPLASH being set"
+elif [ ! -e "$BOOT_SPLASH" ]; then
+	splash_warn "The splash image path '$BOOT_SPLASH' doesn't exist"
+else
+	[[ -f "$BOOT_SPLASH" && "$BOOT_SPLASH" != *.tar.gz ]] \
+		&& setup_splash_img \
+		|| setup_splash_animation
+	setup_splash_specs
+	rm -rf initramfs/animation
+fi

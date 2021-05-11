@@ -1,4 +1,4 @@
 #!/bin/sh
 
 # Start msm-fb-refresher early
-timeout @FB_REFRESHER_TIMEOUT@ msm-fb-refresher --loop &
+timeout @FB_UPDATE_TIMEOUT@ msm-fb-refresher --loop &

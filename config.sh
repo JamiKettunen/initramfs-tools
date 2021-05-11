@@ -81,8 +81,22 @@ CPIO_COMPRESS_ARGS=""
 # choices: 1 / 0 (default)
 CPIO_COMPRESS_KEEP_SRC=0
 
-# Path to a (optionally pre-gzipped) PPM image file to show on the framebuffer when booting
+# Path to a (optionally pre-gzipped) PPM image file to show on the framebuffer when booting;
+# if this is a directory (or pre-gzipped tar archive) look for PPM animation frames to cycle
+# through during boot
 BOOT_SPLASH=""
+
+# Specifications on how to render the splash image(s); animated splashes are split to static
+# (first frame) and animation frames (the rest), only static specs apply to singlular splash images
+# format: "static_center,static_offset_top,static_offset_left|anim_center,anim_offset_top,anim_offset_left"
+# e.g. "|1,280" = "0,0,0|1,280,0" / "1" = "1,0,0|0,0,0"
+BOOT_SPLASH_SPECS=""
+
+# How many milliseconds to wait after drawing before advancing to the next frame?
+# only applicable if BOOT_SPLASH is a directory or .tar.gz containing PPM images.
+# e.g. for 3 FPS one can say 333, and for 30 FPS about 33
+# values <1 = run update loop without any extra pauses
+BOOT_ANIMATION_INTERVAL=333
 
 # Drop to shell (ash) instead of hanging forever when e.g. errors occur?
 # choices: 1 / 0 (default)
@@ -92,10 +106,10 @@ BOOT_DROP_TO_SHELL=0
 # common choices include: "usb0", "rndis0" or "eth0"
 BOOT_RNDIS_IFACE="usb0"
 
-# How many seconds to wait until terminating the msm-fb-refresher hook?
-# if this is kept running it can severely affect rendering performance after booting!
+# How many seconds to wait until terminating the msm-fb-refresher & splash (animation) hooks?
+# if fb-refresher is kept running it can severely affect rendering performance after booting!
 # values <1 = keep running forever
-BOOT_FB_REFRESHER_TIMEOUT=5
+BOOT_FB_UPDATE_TIMEOUT=5
 
 # Potential local config overrides
 [ -e config.custom.sh ] && . config.custom.sh || :

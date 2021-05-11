@@ -8,7 +8,7 @@ mount_proc_sys_dev
 no_fwdcon=$(get_opt no_fwdcon)
 [ "$no_fwdcon" != "1" ] && setlogcons 8
 silent_boot=$(get_opt silent_boot)
-if [ -e /splash.ppm.gz ]; then
+if hook_exists splash; then
 	# clear potential early kernel logs
 	printf '\033[H\033[2J' > /dev/tty1
 	silent_boot=1
@@ -31,9 +31,6 @@ setup_extra_hooks
 for hook in $(find /hooks -maxdepth 1 -type f 2>/dev/null | sort -V); do
 	. "$hook"
 done
-
-# Show boot splash after potential display modules loaded etc.
-[ -e /splash.ppm.gz ] && fbsplash -s /splash.ppm.gz -c &
 
 # RootFS mounting system:
 # 1. if rd.rootfs exists, assuming it is a partition containing the rootfs

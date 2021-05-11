@@ -1,7 +1,7 @@
 #!/bin/bash
 fb_refresher_hook="$(hook_get msm-fb-refresher)"
-if [ $BOOT_FB_REFRESHER_TIMEOUT -gt 0 ]; then
-	sed "s/@FB_REFRESHER_TIMEOUT@/$BOOT_FB_REFRESHER_TIMEOUT/" -i "$fb_refresher_hook"
+if [ $BOOT_FB_UPDATE_TIMEOUT -gt 0 ]; then
+	sed "s/@FB_UPDATE_TIMEOUT@/$BOOT_FB_UPDATE_TIMEOUT/" -i "$fb_refresher_hook"
 else
-	sed "s/^timeout @FB_REFRESHER_TIMEOUT@ //" -i "$fb_refresher_hook"
+	sed "s/^timeout @FB_UPDATE_TIMEOUT@ //" -i "$fb_refresher_hook"
 fi

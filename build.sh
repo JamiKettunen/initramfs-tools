@@ -129,6 +129,12 @@ hook_get() {
 		echo "$hook_matches" | head -1
 	fi
 }
+setup_splash() {
+	if [ "$BOOT_SPLASH" ] && ! hook_present splash; then
+		#log "Including 'splash' hook as BOOT_SPLASH is defined"
+		HOOKS_ENABLE+=(splash)
+	fi
+}
 setup_hooks() {
 	cp -r {hooks,functions} initramfs/
 	enabled_hooks="${HOOKS_ENABLE[@]}"
@@ -200,26 +206,6 @@ setup_misc() {
 	# remove placeholder files for previously empty directories
 	find initramfs/ -type f -name ".keep" -delete
 }
-setup_splash() {
-	[ -z "$BOOT_SPLASH" ] && return
-	if [ ! -e "$BOOT_SPLASH" ]; then
-		warn "The splash image file '$BOOT_SPLASH' doesn't exist, skipping..."
-		return
-	fi
-
-	log "Setting boot splash image to '$BOOT_SPLASH'..."
-	splash_file="$(readlink -f "$BOOT_SPLASH")"
-	type="$(file "$BOOT_SPLASH")"
-	if [[ "$type" != *"gzip compressed data"* ]]; then
-		if [[ "$type" != *"Netpbm image data"* ]]; then
-			warn "The splash image file isn't a valid Netpbm image, skipping..."
-			return
-		fi
-		gzip -nc "$splash_file" > initramfs/splash.ppm.gz
-	else
-		cp "$splash_file" initramfs/splash.ppm.gz
-	fi
-}
 create_cpio() {
 	cpio_name="initramfs${CPIO_EXTRA_NAME}.cpio"
 	if [ $CPIO_RM_EXISTING -eq 1 ]; then
@@ -262,10 +248,10 @@ cp init{,_functions} initramfs/
 
 [[ ${#KERNEL_MODULES_COPY[@]} -gt 0 || ${#KERNEL_MODULES_PROBE[@]} -gt 0 ]] \
 	&& setup_kmodules
+setup_splash
 setup_hooks
 setup_overlay
 setup_misc
-setup_splash
 create_cpio
 
 rm -rf initramfs

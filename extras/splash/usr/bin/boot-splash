@@ -1,0 +1,79 @@
+#!/bin/sh
+
+# Standalone setup
+type dbg >/dev/null || . /functions/core.sh
+
+setup_vars() {
+	static_args="-c"
+	animation_args="-c"
+	[ -e /etc/fbsplash_custom.cfg ] && . /etc/fbsplash_custom.cfg || return
+
+	res="$(grep -Eo '[0-9]+x[0-9]+' /sys/class/graphics/fb0/modes)" # e.g. "1080x2160"
+	res_w=$(echo "$res" | cut -d'x' -f1) # e.g. 1080
+	res_h=$(echo "$res" | cut -d'x' -f2) # e.g. 2160
+
+	if [[ $static_res_w -le $res_w && $static_res_h -le $res_h ]]; then
+		[ "$static_offset_top" ] || static_offset_top=0
+		[ "$static_offset_left" ] || static_offset_left=0
+		if [ "$static_center" = "1" ]; then
+			static_offset_top=$((res_h/2-static_res_h/2+static_offset_top))
+			static_offset_left=$((res_w/2-static_res_w/2+static_offset_left))
+		fi
+		if [ $static_offset_top -lt 0 ]; then
+			static_offset_top=0
+		elif [ $static_offset_top -gt $res_h ]; then
+			static_offset_top=$((res_h-static_res_h))
+		elif [ $static_offset_left -lt 0 ]; then
+			static_offset_left=0
+		elif [ $static_offset_left -gt $res_w ]; then
+			static_offset_left=$((res_w-static_res_w))
+		fi
+		echo -e "IMG_TOP=$static_offset_top\nIMG_LEFT=$static_offset_left" > /etc/fbsplash_static.cfg
+		static_args="$static_args -i /etc/fbsplash_static.cfg"
+	fi
+	if [[ $anim_res_w -le $res_w && $anim_res_h -le $res_h ]]; then
+		[ "$anim_offset_top" ] || anim_offset_top=0
+		[ "$anim_offset_left" ] || anim_offset_left=0
+		if [ "$anim_center" = "1" ]; then
+			anim_offset_top=$((res_h/2-anim_res_h/2+anim_offset_top))
+			anim_offset_left=$((res_w/2-anim_res_w/2+anim_offset_left))
+		fi
+		if [ $anim_offset_top -lt 0 ]; then
+			anim_offset_top=0
+		elif [ $anim_offset_top -gt $res_h ]; then
+			anim_offset_top=$((res_h-anim_res_h))
+		elif [ $anim_offset_left -lt 0 ]; then
+			anim_offset_left=0
+		elif [ $anim_offset_left -gt $res_w ]; then
+			anim_offset_left=$((res_w-anim_res_w))
+		fi
+		echo -e "IMG_TOP=$anim_offset_top\nIMG_LEFT=$anim_offset_left" > /etc/fbsplash_anim.cfg
+		animation_args="$animation_args -i /etc/fbsplash_anim.cfg"
+	fi
+}
+setup_vars
+
+# splash image
+if [ -e /splash.ppm.gz ]; then
+	fbsplash -s /splash.ppm.gz $static_args &
+fi
+# splash animation
+if [ -e /animation.tar.gz ]; then
+	[ -e /animation ] && rm -rf /animation
+	mkdir -p /animation
+	tar -C /animation -xf /animation.tar.gz
+	set -- $(ls /animation/*.ppm 2>/dev/null | sort -V)
+	if [ -z "$1" ]; then
+		dbg "splash: No /animation/*.ppm frames found!"
+		return
+	fi
+
+	while true; do
+		for frame in $@; do
+			fbsplash -s $frame $animation_args
+			sleep @ANIMATION_INTERVAL@
+		done
+	done
+else
+	dbg "splash: No /splash.ppm.gz image or /animation/*.ppm frames found!"
+fi

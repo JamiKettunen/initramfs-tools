@@ -43,6 +43,10 @@ hook_get() {
 	fi
 }
 
+# Check if a hook by name exists
+# $1 = hook name, e.g. rndis
+hook_exists() { [ "$(hook_get "$1")" ]; }
+
 # Run a hook by name manually
 # $1 = hook name, e.g. rndis
 hook_exec() {
