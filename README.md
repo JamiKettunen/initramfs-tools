@@ -17,7 +17,7 @@ For e.g. scripting you can additionally add the `-N` flag to avoid interactive a
   * Late triggers run **after** a rootfs is mounted and **right before** `switch_root`
   * Optionally extra hooks can be added and triggered manually via kernel cmdline
 * Produced `cpio` archives can be compressed with either `gzip` or `lz4`
-* Optional PPM image splash screens
+* Optional PPM image splash screens ([or even boot animations with some limitations](https://github.com/JamiKettunen/initramfs-tools/blob/0e66266/config.sh#L87-L107))
 * Ideally boots any OS (distro) using the Linux kernel
 
 ## Runtime configuration
