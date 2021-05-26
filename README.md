@@ -1,6 +1,13 @@
 # initramfs-tools
 Create small and adaptable Linux initramfs' mainly intended for embedded (e.g. Android) devices.
 
+## Building
+Create a `config.custom.sh`, tweak options defined in `config.sh` as you please & simply run the `build.sh` script:
+```
+$ ./build.sh
+```
+For e.g. scripting you can additionally add the `-N` flag to avoid interactive actions.
+
 ## Features
 * An easily configurable Buildroot/BusyBox environment
 * Kernel module support
