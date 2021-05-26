@@ -1,25 +1,50 @@
 #!/bin/bash -e
+
+# Runtime vars
+###############
 BASEDIR="$(readlink -f "$(dirname "$0")")"
 INITDIR="$BASEDIR/.."
+NON_INTERACTIVE=0
 
-##########
-# Config
-##########
+# Functions
+############
+log() { echo ">> $1"; }
+die() { echo "$1" >&2; exit 1; }
+err() { die "ERROR: $1"; }
+usage() { die "usage: $0 [-N]"; }
+parse_args() {
+	while getopts ":N" OPT; do
+		case "$OPT" in
+			N) NON_INTERACTIVE=1 ;;
+			*) usage ;;
+		esac
+	done
+}
+get_ans() {
+	local msg=""
+	case $1 in
+		"ccache") [ $NON_INTERACTIVE -ne 1 ] && msg="Clean ccache located at ~/.buildroot-ccache (y/N)" || ans="N" ;;
+		"updates") [ $NON_INTERACTIVE -ne 1 ] && msg="Pull updates to buildroot tree (Y/n)" || ans="Y" ;;
+		"clean") [ $NON_INTERACTIVE -ne 1 ] && msg="Clean previous build output artifacts (y/N)" || ans="N" ;;
+		"br_config") [ $NON_INTERACTIVE -ne 1 ] && msg="Regenerate Buildroot .config from \"initramfs_defconfig ${BR2_CONFIGS/,/ }\" (y/N)" || ans="Y" ;;
+		"br_menuconfig") [ $NON_INTERACTIVE -ne 1 ] && msg="Run Buildroot menuconfig (y/N)" || ans="N" ;;
+		"bb_config") [ $NON_INTERACTIVE -ne 1 ] && msg="Tweak local BusyBox config \"$bb_cfg_name\" (y/N)" || ans="N" ;;
+		"bb_config_update") msg="Update \"$bb_cfg_name\" with the above diff (Y/n)" ;;
+	esac
+	[ $NON_INTERACTIVE -eq 1 ] && return
+	read -erp ">> $msg? " ans
+}
+m() { make BR2_EXTERNAL="$BASEDIR/external" $@; }
+
+# Script
+#########
 cd "$INITDIR"
 . config.sh
 cd "$BASEDIR"
+parse_args $@
 
-#############
-# Functions
-#############
-log() { echo ">> $1"; }
-m() { make BR2_EXTERNAL="$BASEDIR/external" $@; }
-
-##########
-# Script
-##########
 if [ -d $HOME/.buildroot-ccache ]; then
-	read -erp ">> Clean ccache located at ~/.buildroot-ccache (y/N)? " ans
+	get_ans ccache
 	[[ "${ans^^}" = "Y"* ]] && ccache -d ~/.buildroot-ccache -C
 fi
 
@@ -30,7 +55,7 @@ if [ ! -d buildroot-git ]; then
 fi
 cd buildroot-git
 if [ $pull_ask -eq 1 ]; then
-	read -erp ">> Pull updates to buildroot tree (Y/n)? " ans
+	get_ans updates
 	[[ "${ans^^}" != "N"* ]] && git pull --ff-only
 fi
 
@@ -39,7 +64,7 @@ log "Adding $patch_count out-of-tree patch(es)..."
 cp -r "$BASEDIR"/patches/* .
 
 if [ -d output ]; then
-	read -erp ">> Clean previous build output artifacts (y/N)? " ans
+	get_ans clean
 	if [[ "${ans^^}" = "Y"* ]]; then
 		m -j clean
 		rm -r output # "$INITDIR/$BR2_TARBALL"
@@ -48,7 +73,7 @@ fi
 
 gen_cfg=1
 if [ -e .config ]; then
-	read -erp ">> Regenerate Buildroot .config from \"initramfs_defconfig ${BR2_CONFIGS/,/ }\" (y/N)? " ans
+	get_ans br_config
 	[[ "${ans^^}" != "Y"* ]] && gen_cfg=0
 fi
 if [ $gen_cfg -eq 1 ]; then
@@ -59,26 +84,23 @@ if [ $gen_cfg -eq 1 ]; then
 	m final_defconfig
 fi
 
-read -erp ">> Run Buildroot menuconfig (y/N)? " ans
+get_ans br_menuconfig
 [[ "${ans^^}" = "Y"* ]] && m menuconfig
 
 bb_cfg="$(sed -n "s/^BR2_PACKAGE_BUSYBOX_CONFIG=//p" .config)" # e.g. "$(TOPDIR)/../busybox_debug.config"
 bb_cfg="${bb_cfg/\$(TOPDIR)\/../$BASEDIR}" # "$(TOPDIR)/.." -> "$BASEDIR"
 bb_cfg="${bb_cfg:1:-1}" # drop surrounding quotes
-if [ ! -e "$bb_cfg" ]; then
-	echo "ERROR: BusyBox config '$bb_cfg' doesn't exist!"
-	exit 1
-fi
+[ -e "$bb_cfg" ] || err "BusyBox config '$bb_cfg' doesn't exist!"
 bb_cfg_dir="$(dirname "$bb_cfg")" # e.g. "$BASEDIR"
 bb_cfg_name="$(basename "$bb_cfg")" # e.g. "busybox_debug.config"
-read -erp ">> Tweak local BusyBox config \"$bb_cfg_name\" (y/N)? " ans
+get_ans bb_config
 if [[ "${ans^^}" = "Y"* ]]; then
 	m busybox-menuconfig
 
 	bb_cfg_new="$bb_cfg_dir/$bb_cfg_name.new"
 	cp output/build/busybox-*/.config "$bb_cfg_new"
 	diff --color "$bb_cfg" "$bb_cfg_new" || :
-	read -erp ">> Update \"$bb_cfg_name\" with the above diff (Y/n)? " ans
+	get_ans bb_config_update
 	[[ "${ans^^}" != "N"* ]] && mv "$bb_cfg_new" "$bb_cfg" # || rm "$bb_cfg_new"
 fi
 

@@ -111,5 +111,10 @@ BOOT_RNDIS_IFACE="usb0"
 # values <1 = keep running forever
 BOOT_FB_UPDATE_TIMEOUT=5
 
+# Run the build scripts without any interactive prompts; great for e.g. scripting
+# Can also be enabled via -N arg for the build scripts
+# choices: 1 / 0 (default)
+NON_INTERACTIVE=0
+
 # Potential local config overrides
 [ -e config.custom.sh ] && . config.custom.sh || :

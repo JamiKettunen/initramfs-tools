@@ -1,32 +1,47 @@
 #!/bin/bash -e
+
+# Runtime vars
+###############
 BASEDIR="$(readlink -f "$(dirname "$0")")"
-cd "$BASEDIR"
+NON_INTERACTIVE=0
 
-##########
-# Config
-##########
-. config.sh
-
-#############
 # Functions
-#############
+############
 log() { echo ">> $1"; }
 warn() { echo "WARN: $1" >&2; }
+die() { echo "$1" >&2; exit 1; }
 err() {
-	echo "ERROR: $1" >&2
 	rm -rf initramfs/
-	exit 1
+	die "ERROR: $1"
+}
+usage() { die "usage: $0 [-N]"; }
+parse_args() {
+	while getopts ":N" OPT; do
+		case "$OPT" in
+			N) NON_INTERACTIVE=1 ;;
+			*) usage ;;
+		esac
+	done
+}
+get_ans() {
+	local msg=""
+	case $1 in
+		"buildroot") [ $NON_INTERACTIVE -ne 1 ] && msg="Update Buildroot tarball (y/N)" || ans="N" ;;
+	esac
+	[ $NON_INTERACTIVE -eq 1 ] && return
+	read -erp ">> $msg? " ans
 }
 setup_br2() {
 	if [[ -e "$BR2_TARBALL" && -z "$BR2_SKIP_BUILD" ]]; then
-		read -rp ">> Update Buildroot tarball (y/N)? " update_br
-		[[ "${update_br^^}" = "Y"* ]] && BR2_SKIP_BUILD=0 || BR2_SKIP_BUILD=1
+		get_ans buildroot
+		[[ "${ans^^}" = "Y"* ]] && BR2_SKIP_BUILD=0 || BR2_SKIP_BUILD=1
 	elif [ ! -e "$BR2_TARBALL" ]; then
 		BR2_SKIP_BUILD=0
 	fi
 
 	if [ $BR2_SKIP_BUILD -eq 0 ]; then
-		bash -c "$BASEDIR/buildroot/build.sh"
+		[ $NON_INTERACTIVE -eq 1 ] && BR2_ARGS="-N"
+		bash -c "$BASEDIR/buildroot/build.sh $BR2_ARGS"
 	else
 		log "Skipping Buildroot tarball rebuild..."
 	fi
@@ -254,9 +269,11 @@ create_cpio() {
 	cd ..
 }
 
-##########
 # Script
-##########
+#########
+cd "$BASEDIR"
+. config.sh
+parse_args $@
 setup_br2
 
 [ -d initramfs ] && rm -rf initramfs
