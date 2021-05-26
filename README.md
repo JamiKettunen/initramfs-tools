@@ -9,7 +9,7 @@ $ ./build.sh
 For e.g. scripting you can additionally add the `-N` flag to avoid interactive actions.
 
 ## Features
-* An easily configurable Buildroot/BusyBox environment
+* An easily configurable environment based around [Buildroot](https://buildroot.org) & [BusyBox](https://busybox.net)
 * Kernel module support
 * Shell script hook system with ordering and early/late triggers
   * Execution order is decided by the numbering of the hook filenames
