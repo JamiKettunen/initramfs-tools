@@ -101,6 +101,11 @@ BOOT_SPLASH_SPECS=""
 # values <1 = run update loop without any extra pauses
 BOOT_ANIMATION_INTERVAL=333
 
+# How many seconds to wait until terminating the msm-fb-refresher & splash (animation) hooks?
+# if fb-refresher is kept running it can severely affect rendering performance after booting!
+# values <1 = keep running forever
+BOOT_FB_UPDATE_TIMEOUT=5
+
 # Drop to shell (ash) instead of hanging forever when e.g. errors occur?
 # choices: 1 / 0 (default)
 BOOT_DROP_TO_SHELL=0
@@ -108,11 +113,6 @@ BOOT_DROP_TO_SHELL=0
 # USB RNDIS network interface on the device;
 # common choices include: "usb0", "rndis0" or "eth0"
 BOOT_RNDIS_IFACE="usb0"
-
-# How many seconds to wait until terminating the msm-fb-refresher & splash (animation) hooks?
-# if fb-refresher is kept running it can severely affect rendering performance after booting!
-# values <1 = keep running forever
-BOOT_FB_UPDATE_TIMEOUT=5
 
 # Run the build scripts without any interactive prompts; great for e.g. scripting
 # Can also be enabled via -N arg for the build scripts
