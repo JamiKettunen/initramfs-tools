@@ -48,12 +48,31 @@ if [ -d $HOME/.buildroot-ccache ]; then
 	[[ "${ans^^}" = "Y"* ]] && ccache -d ~/.buildroot-ccache -C
 fi
 
-pull_ask=1
-if [ ! -d buildroot-git ]; then
-	pull_ask=0
-	git clone https://git.buildroot.net/buildroot buildroot-git
+if [[ "$BR2_SOURCE" = *"git"* && "$BR2_SOURCE" != *".tar"* ]]; then
+	buildroot_git=1
+	buildroot_dir="buildroot-git"
+else
+	buildroot_git=0
+	buildroot_dir="buildroot-src"
 fi
-cd buildroot-git
+pull_ask=$buildroot_git
+if [ ! -d "$buildroot_dir" ]; then
+	if [ $buildroot_git -eq 1 ]; then
+		git clone "$BR2_SOURCE" "$buildroot_dir"
+		pull_ask=0
+	else
+		mkdir "$buildroot_dir"
+		src_tarball="$(basename "$BR2_SOURCE")"
+		wget "$BR2_SOURCE" -O "$src_tarball"
+		tar -xf "$src_tarball" -C "$buildroot_dir"
+		if [[ "$(ls "$buildroot_dir")" = "buildroot-"* ]]; then
+			shopt -s dotglob
+			mv "$buildroot_dir"/buildroot-*/* "$buildroot_dir"/
+			rmdir "$buildroot_dir"/buildroot-*
+		fi
+	fi
+fi
+cd "$buildroot_dir"
 if [ $pull_ask -eq 1 ]; then
 	get_ans updates
 	[[ "${ans^^}" != "N"* ]] && git pull --ff-only

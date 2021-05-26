@@ -5,6 +5,9 @@
 # NOTE: This should be considered a default config; please prefer to override
 #       options in a new config.custom.sh file which this sources at the end!
 
+# URL to Buildroot source code; can be a git repository or tarball
+BR2_SOURCE="https://git.buildroot.net/buildroot"
+
 # Kernel header version to target Buildroot binaries against; this should match the lowest
 # kernel version you plan to boot the initramfs with
 # choices: see https://www.kernel.org/ for currently supported upstream series'
