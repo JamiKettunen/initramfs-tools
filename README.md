@@ -2,7 +2,7 @@
 Create small and adaptable Linux initramfs' mainly intended for embedded (e.g. Android) devices.
 
 ## Building
-Create a `config.custom.sh`, tweak options defined in `config.sh` as you please & simply run the `build.sh` script:
+Create a `config.custom.sh`, tweak options defined in [`config.sh`](config.sh) as you please & simply run the [`build.sh`](build.sh) script:
 ```
 $ ./build.sh
 ```
