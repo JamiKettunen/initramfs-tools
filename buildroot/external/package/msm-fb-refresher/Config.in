@@ -1,5 +1,5 @@
 config BR2_PACKAGE_MSM_FB_REFRESHER
 	bool "msm-fb-refresher"
 	help
-	  Refresh /dev/fb0 once every 60 seconds with an FBIOPAN_DISPLAY
+	  Refresh /dev/fb0 60 times every second with an FBIOPAN_DISPLAY
 	  ioctl; required by most if not all (Qualcomm) downstream kernels
