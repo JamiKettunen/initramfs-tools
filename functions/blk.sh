@@ -43,13 +43,14 @@ list_pars() {
 		return
 	fi
 
-	pars="$(grep '[0-9]$' /proc/partitions | grep -Ev 'ram[0-9]+' | awk '{print $4}' | sort -V | awk '{print}' ORS=' ')" # e.g. "sda1 sda2 ... sdf7"
-	blks="$(ls /sys/block/ | grep -Ev "(ram|loop|nbd)[0-9]+" | awk '{print}' ORS=' ')" # e.g. "sda sdb ..."
+	pars="$(grep '[0-9]$' /proc/partitions | grep -Ev '(ram|boot)[0-9]+' | awk '{print $4}' | sort -V | awk '{print}' ORS=' ')" # e.g. "sda1 sda2 ... sdf7"
+	blks="$(ls /sys/block/ | grep -Ev "(ram|loop|nbd|boot)[0-9]+$|rpmb$" | awk '{print}' ORS=' ')" # e.g. "sda sdb ..."
 	for blk in $blks; do # e.g. "sda"
 		par_names="$(fdisk -l /dev/$blk | awk '/^Number/,0{if (!/^Number/)print $5}')" # e.g. "ssd\npersist\ncache\n..."
 		par_i=0
 		for par in $pars; do # e.g. "sda1"
 			begins_with "$blk" "$par" || continue # skip partitions for other block devices
+			[ "$par" = "$blk" ] && continue # skip "partitions" matching whole block device
 			par_i=$((par_i+1))
 			par_size=$(blockdev --getsize64 /dev/$par) # e.g. 524288
 			[ $par_size -lt $ignore_pars_under ] && continue # ignore too small partitions
