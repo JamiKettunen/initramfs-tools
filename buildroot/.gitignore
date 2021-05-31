@@ -1,5 +1,5 @@
 # Build dir
-/buildroot-git
+/buildroot-*
 
 # Staging BusyBox config changes
 /busybox*.config.new
