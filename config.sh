@@ -11,8 +11,8 @@ BR2_SOURCE="https://git.buildroot.net/buildroot"
 # Kernel header version to target Buildroot binaries against; this should match the lowest
 # kernel version you plan to boot the initramfs with
 # choices: see https://www.kernel.org/ for currently supported upstream series'
-# e.g. "4.4", "5.11" or "5.12"
-BR2_KERNEL_HEADERS="5.11"
+# e.g. "4.4" or "5.12"
+BR2_KERNEL_HEADERS="5.12"
 
 # Additional Buildroot defconfig(s) to append after initramfs_defconfig; multiple ones
 # can be separated with commas (,), e.g. "extra1_defconfig,extra2_defconfig"
