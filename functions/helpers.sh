@@ -32,6 +32,21 @@ readlink_hack() {
 		|| readlink_hack "$new_path" "$path_prefix"
 }
 
+# Get a variable's value from a file
+# $1 = variable name
+# $2 = file
+get_value() {
+	[ -e "$2" ] || return # no file
+	local match="$(grep "^$1=" "$2")" # e.g. PRETTY_NAME="Distro Name"
+	[ "$match" ] || return # no match (or value)
+	local value="$(echo "$match" | sed -n "s/^$1=//p")" # e.g. "Distro Name"
+	if [[ "${value:0:1}" == '"' || "${value:0:1}" == "'" ]]; then
+		echo "${value:1:-1}" # assume quoted string
+	else
+		echo "$value" # non-quoted strings
+	fi
+}
+
 # Returns PRETTY_NAME from /etc/os-release
 # $1 = rootfs location
 get_os_name() {
@@ -40,16 +55,14 @@ get_os_name() {
 	if [[ -e "$os_release" || -L "$os_release" ]]; then # most (if not all) Linux distros
 		[[ ! -e "$os_release" && -L "$os_release" ]] \
 			&& os_release="$(readlink_hack "$os_release" "$1")"
-		os_name="$(grep '^PRETTY_NAME=' $os_release)"
-		[ -z "$os_name" ] && return # no PRETTY_NAME :(
-		eval "$os_name" # e.g. eval PRETTY_NAME="Distro Name"
-		os_name="$PRETTY_NAME"
+		local os_name="$(get_value PRETTY_NAME "$os_release")"
+		[ "$os_name" ] || return # no PRETTY_NAME :(
 		[ "$os_name" = "void" ] && os_name="Void Linux"
 		echo "$os_name"
 	elif [ -e "$build_prop" ]; then # Android
 		# Here we're assuming that system-as-root has only been available since Pie
 		# https://source.android.com/setup/start/build-numbers
-		api_level=$(sed -n 's/^ro.build.version.sdk=//p' "$build_prop") # e.g. 28
+		local api_level=$(get_value ro.build.version.sdk "$build_prop") # e.g. 28
 		[ -z "$api_level" ] && return # invalid Android rootfs build.prop
 		droid_ver=$(( api_level - 19 )) # e.g. 9
 		echo "Android $droid_ver"

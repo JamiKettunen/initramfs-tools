@@ -1,3 +1,6 @@
+# Standalone prep
+type get_value >/dev/null || . /functions/helpers.sh
+
 # Logging
 ##########
 
@@ -60,17 +63,16 @@ hook_exec() {
 # $2 = value
 add_const() {
 	eval "$1=\"$2\""
-	echo "$1=$2" >> /constants
+	echo "$1=\"$2\"" >> /constants
 }
 
 # Evaluate constant value(s) stored in /constants
 eval_const() {
 	for const; do # loop $@
-		found_const="$(grep "^$1=" /constants)"
-		[ "$found_const" ] \
-			&& eval "$1=\"$(sed -n "s/$1=//p" /constants)\"" \
-			|| dbg "eval_const(): couldn't find '$1', not evaluating..."
-		shift
+		local value="$(get_value $const /constants)"
+		[ "$value" ] \
+			&& eval "$const=\"$value\"" \
+			|| dbg "eval_const(): couldn't find '$const', not evaluating..."
 	done
 }
 

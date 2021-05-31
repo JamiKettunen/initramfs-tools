@@ -1,3 +1,6 @@
+# Standalone prep
+type get_value >/dev/null || . /functions/helpers.sh
+
 # Opts
 #######
 
@@ -17,12 +20,10 @@ get_cmdline_opt() {
 # e.g. get_opt rootfs -> "/dev/sda13/rootfs.img"
 get_opt() {
 	opt="$1"
-	if [ -e /rd.cfg ]; then # attempt getting value from rd.cfg
-		value="$(sed -n "s/$opt=//p" /rd.cfg)"
-		if [ "$value" ]; then
-			echo "$value"
-			return
-		fi
+	local value="$(get_value "$opt" /rd.cfg)" # attempt getting value from rd.cfg
+	if [ "$value" ]; then
+		echo "$value"
+		return
 	fi
 	get_cmdline_opt "rd.$opt" # fallback to cmdline
 }
