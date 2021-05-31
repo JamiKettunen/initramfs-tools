@@ -1,0 +1,13 @@
+#!/bin/bash
+mass_storage_devs_count=${#MASS_STORAGE_KNOWN_PARTITIONS[@]}
+mass_storage_devs=""
+if [ $mass_storage_devs_count -gt 0 ]; then
+	[ $mass_storage_devs_count -gt 8 ] \
+		&& warn "Known mass storage partitions count exceeds 8; some may be ignored during runtime!"
+	for dev in ${MASS_STORAGE_KNOWN_PARTITIONS[@]}; do
+		mass_storage_devs+="/dev/$dev:\n"
+	done
+else
+	mass_storage_devs="\$(fdisk -l | grep '^Disk /' | cut -d' ' -f2 | sort -V)"
+fi
+sed "s;@KNOWN_PARTITIONS@;$mass_storage_devs;" -i initramfs/usr/bin/toggle-mass-storage

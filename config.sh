@@ -114,6 +114,13 @@ BOOT_DROP_TO_SHELL=0
 # common choices include: "usb0", "rndis0" or "eth0"
 BOOT_RNDIS_IFACE="usb0"
 
+# A list of known (safe) partitions under /dev that should be exposed via the mass-storage hook
+# instead of defaulting to all block devices
+# NOTE: Usually only the first 8 will be visible to hosts even if FSG_MAX_LUNS of 16
+#       has been in place since kernel v4.3!
+# e.g. (sde21 sda13 sde19)
+MASS_STORAGE_KNOWN_PARTITIONS=()
+
 # Run the build scripts without any interactive prompts; great for e.g. scripting
 # Can also be enabled via -N arg for the build scripts
 # choices: 1 / 0 (default)

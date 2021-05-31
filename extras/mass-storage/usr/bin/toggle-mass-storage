@@ -33,15 +33,17 @@ F_MASS_STORAGE=$FUNCS/$F_NAME
 if [ "$1" = "on" ]; then
 	lun0_file="$(cat $F_MASS_STORAGE/lun.0/file)"
 	if [ -z "$lun0_file" ]; then
-		disks="$(fdisk -l | grep '^Disk /' | cut -d' ' -f2 | sort -V)" # e.g. "/dev/sda:\n/dev/sdb:\n..."
+		items="@KNOWN_PARTITIONS@" # e.g. "/dev/sda:\n/dev/sdb:\n..."
 		[ "$(get_opt mass_storage_rw)" = "1" ] && ro=0 || ro=1
 		i=0
-		for disk in $disks; do
+		for item in $items; do
+			disk=${item::-1} # e.g. "/dev/sda"
+			[ -e $disk ] || continue # skip non-existant devices
 			lun=$F_MASS_STORAGE/lun.$i # e.g. lun.[0-6]
 			mkdir -p $lun
 			echo $ro > $lun/ro # 1|0
-			echo ${disk::-1} > $lun/file # e.g. "/dev/sda"
-			echo "$DEVICE_MODEL's ${disk:5:-1}" > $lun/inquiry_string # e.g. "OnePlus 5T's sda"
+			echo $disk > $lun/file
+			echo "$DEVICE_MODEL's ${disk:5}" > $lun/inquiry_string # e.g. "OnePlus 5T's sda"
 			i=$(($i+1))
 		done
 	fi
