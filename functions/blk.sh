@@ -71,7 +71,7 @@ list_pars() {
 mount_rootfs_par() {
 	if grep -q ' /rootfs_par ' /proc/mounts; then
 		dbg "blk: mount_rootfs_par(): /rootfs_par already mounted, ignoring..."
-		return
+		rootfs_mount_error=0; return
 	fi
 	mkdir -p /rootfs_par
 
@@ -113,7 +113,7 @@ mount_rootfs() {
 	mount_rootfs_par
 	if grep -q ' /rootfs ' /proc/mounts; then
 		dbg "blk: mount_rootfs(): /rootfs already mounted, ignoring..."
-		return
+		rootfs_mount_error=0; return
 	fi
 	mkdir -p /rootfs
 
