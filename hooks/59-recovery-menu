@@ -1,24 +1,29 @@
 #!/bin/sh
 
+# Standalone prep
+type parse_rootfs_par >/dev/null || . /init_functions
+[ "$DEVICE_MODEL" ] || eval_const DEVICE_MODEL KERNEL_VER NPROC MEM
+
 # Font setup
-font="@FONT@"
-gunzip /fonts/$font.psf.gz
-loadfont < /fonts/$font.psf
+font="/fonts/@FONT@.psf"
+[ -e "$font.gz" ] && gunzip "$font.gz"
+loadfont < "$font"
 
 # Runtime vars
 soc="$(sed -n 's/model name\t: //p' /proc/cpuinfo | head -1)"
 [ -z "$soc" ] && soc="$(sed -n 's/Hardware\t: //p' /proc/cpuinfo | head -1)"
+# TODO: fallback to "cat /sys/firmware/devicetree/base/cpus/cpu@0/compatible"?
 rootfs=$(get_opt rootfs)
 arch="$(uname -m)"
 bat_sysfs="/sys/class/power_supply"
 bat_count=$(ls $bat_sysfs 2>/dev/null | wc -l) # e.g. 1
-tz_sysfs="/sys/class/thermal"
-tz_count=$(ls $tz_sysfs 2>/dev/null | wc -l) # e.g. 20
+tz_sysfs="/sys/class/thermal/thermal_zone"
+tz_count=$(find ${tz_sysfs}* 2>/dev/null | wc -l) # e.g. 20
 fb_rotation_sysfs=/sys/class/graphics/fbcon/rotate
 fb_sysfs=/sys/class/graphics/fb0
 fb_size="$(grep -Eo '[0-9]+x[0-9]+' $fb_sysfs/modes)" # e.g. "1080x2160"
-fb_w=$(cat $fb_sysfs/virtual_size | cut -d'x' -f1) # e.g. 1080
-fb_h=$(cat $fb_sysfs/virtual_size | cut -d'x' -f2) # e.g. 2160
+fb_w=$(echo $fb_size | cut -d'x' -f1) # e.g. 1080
+fb_h=$(echo $fb_size | cut -d'x' -f2) # e.g. 2160
 [ $fb_h -gt $fb_w ] && fb_portrait=1 || fb_portrait=0
 fb_bpp=$(cat $fb_sysfs/bits_per_pixel) # e.g. 32
 fb_driver="$(cat $fb_sysfs/name | sed 's/^simple$/simplefb/')" # e.g. "simplefb" / "..."
@@ -26,8 +31,8 @@ cpufreq_sysfs=/sys/devices/system/cpu/cpufreq
 cpufreq_policy_count=$(ls $cpufreq_sysfs 2>/dev/null | wc -l) # e.g. 2
 [ $cpufreq_policy_count -gt 0 ] && cpufreq_info=" (up to $(echo "scale=2; $(cat $cpufreq_sysfs/policy*/scaling_max_freq | sort -V | tail -1)/1000000" | bc) GHz)"
 bb_ver="$(sh --help 2>&1 | head -1 | awk '{print $2}')"
-br2_ver="$(sed -n 's/VERSION_ID=//p' /etc/os-release)"
-initfs_ver="$(sed -n 's/RD_VERSION=//p' /etc/os-release)"
+br2_ver="$(get_value VERSION_ID /etc/os-release)"
+initfs_ver="$(get_value RD_VERSION /etc/os-release)"
 display_bl_sysfs=/sys/class/backlight/
 display_bl_count=$(ls $display_bl_sysfs 2>/dev/null | wc -l) # e.g. 1
 if [ $display_bl_count -gt 0 ]; then
@@ -38,6 +43,7 @@ fi
 
 menu_breakout=0
 menu_header_extra=""
+menu_header_extra_newline=1
 menu_index=0
 menu_index_preserve=0
 menu_selection="> "
@@ -45,15 +51,9 @@ menu_page_max_items=20
 
 r_dbg() { dbg "recovery-menu: $1"; }
 
-# NOTE: "|" and "~" are reserved characters!
-show_menu() {
-	opts="$1"
-	#r_dbg "opts = '$opts'"
-	opts_m="$(echo "$opts" | sed -e 's/ /~/g' -e 's/|/ /g')" # e.g. "A A|B|C C..." -> "A~A B C~C"
-	max_i=$(count_chars "|" "$opts")
-
-	header_extra="$2"
-	r_dbg "show_menu(): $header_extra"
+set_header() {
+	header_extra="$1"
+	r_dbg "set_header(): '$header_extra'"
 	if [ "$header_extra" ]; then
 		header_extra=" | $header_extra" # e.g. " | Reboot..."
 		header_extra_len=${#header_extra} # e.g. 12
@@ -69,6 +69,36 @@ show_menu() {
 ==============
 "
 	fi
+	[ "$2" ] && menu_header_extra="$2"
+}
+
+show_header() {
+	clear
+	echo "$header"
+	if [ "$menu_header_extra" ]; then
+		[ $menu_header_extra_newline -eq 1 ] \
+			&& echo "   $menu_header_extra
+" \
+			|| printf "   $menu_header_extra"
+	fi
+}
+
+show_message() {
+	set_header "$1" "$2"
+	menu_header_extra_newline=0
+	show_header
+	menu_header_extra_newline=1
+	[ "$menu_header_extra" ] && menu_header_extra=""
+}
+
+# NOTE: "|" and "~" are reserved characters!
+show_menu() {
+	opts="$1"
+	#r_dbg "opts = '$opts'"
+	opts_m="$(echo "$opts" | sed -e 's/ /~/g' -e 's/|/ /g')" # e.g. "A A|B|C C..." -> "A~A B C~C"
+	max_i=$(count_chars "|" "$opts")
+
+	set_header "$2"
 
 	if [ $menu_index_preserve -eq 1 ]; then
 		i=$menu_index
@@ -77,11 +107,8 @@ show_menu() {
 		i=0
 	fi
 	while true; do
+		show_header
 		tmp_i=0
-		clear
-		echo "$header"
-		[ "$menu_header_extra" ] && echo "   $menu_header_extra
-"
 		for opt in $opts_m; do
 			# TODO: Don't run if no "~" in string
 			opt="$(echo "$opt" | sed -e 's/~/ /g')" # e.g. "A~A" -> "A A"
@@ -225,15 +252,21 @@ umount_rootfs() {
 	#rootfs_location=""
 }
 
-rootfs_par_menu() {
-	[ -z "$PARS_MENU" ] && PARS_MENU="$(list_pars)"
+fetch_pars() {
+	if [ -z "$PARS_MENU" ]; then
+		show_message "$rootfs_opt rootfs target..." "Fetching partition list, please wait..."
+		PARS_MENU="$(list_pars)"
+	fi
+}
 
+rootfs_par_menu() {
+	fetch_pars
 	preserved_menu_index=0
 	while true; do
 		set_rootfs_os_header
 		menu_header_extra="$menu_header_extra
 
-   NOTE: Any partitions less than $list_pars_ignore_under_human_readable in size aren't shown!"
+   NOTE: Any partitions less than $ignore_pars_under_str in size aren't shown!"
 		menu_index=$preserved_menu_index
 		menu_index_preserve=1
 		show_paged_menu "$(echo "$PARS_MENU" | awk '{print}' ORS='|')" "Choose rootfs partition"
@@ -348,15 +381,17 @@ rootfs_menu() {
 	while true; do
 		[ "$rootfs" ] && rootfs_opt="Change" || rootfs_opt="Set a"
 		set_rootfs_os_header
-		show_menu "Choose rootfs partition|Choose rootfs directory/image|Save...|Back..." "$rootfs_opt rootfs target..."
+		show_menu "Choose rootfs partition|Choose rootfs directory/image|Refresh partition list|Save...|Back..." "$rootfs_opt rootfs target..."
 		case $menu_index in
 			0) # par
 				rootfs_par_menu ;;
 			1) # dir/img
 				rootfs_dir_img_menu ;;
-			2) # save
+			2) # refresh pars
+				PARS_MENU=""; fetch_pars ;;
+			3) # save
 				rootfs_save_menu ;;
-			3) # back
+			4) # back
 				break ;;
 		esac
 
@@ -369,7 +404,7 @@ rootfs_menu() {
 
 # Returns human readable size of all detected storage devices (sum).
 get_all_storage() {
-	disks="$(fdisk -l | grep '^Disk /' | cut -d' ' -f2)" # e.g. "/dev/sda:\n/dev/sdb:\n..."
+	disks="$(fdisk -l | grep '^Disk /' | cut -d' ' -f2 | grep -Ev "boot[0-9]+")" # e.g. "/dev/sda:\n/dev/sdb:\n..."
 	total_bytes=0
 	for disk in $disks; do
 		disk_bytes=$(blockdev --getsize64 ${disk::-1}) # e.g. 57940115456
@@ -391,7 +426,7 @@ info_menu() {
 	menu_selection=""
 	[ $bat_count -gt 0 ] && bat_entry="|Battery: $(cat $bat_sysfs/*/capacity)% ($(cat $bat_sysfs/*/status))"
 	[ "$soc" ] && soc_entry="|SoC:     $soc"
-	[ $tz_count -gt 0 ] && temp="$(echo "scale=1; $(cat $tz_sysfs/*/temp 2>/dev/null | sort | tail -1)/1000" | bc)" # e.g. "33.7"
+	[ $tz_count -gt 0 ] && temp="$(echo "scale=1; $(cat ${tz_sysfs}*/temp 2>/dev/null | sort | tail -1)/1000" | bc)" # e.g. "33.7"
 	[ "$temp" ] && temp_entry="|Temp:    $temp°C"
 	storage_entry="|Storage: $(get_all_storage)"
 	fb_extra="$(get_rotation_name $(cat $fb_rotation_sysfs))"
@@ -476,9 +511,36 @@ display_backlight_menu() {
 	done
 }
 
+tz_menu() {
+	if [ $tz_count -lt 1 ]; then
+		menu_header_extra="ERROR: No thermal_zone* sysfs dirs found!"
+		show_menu "Okay" "View temperature sensors"
+		return
+	fi
+
+	entries=""
+	tz_count=0
+	for tz in $(find ${tz_sysfs}*); do
+		temp="$(cat $tz/temp 2>/dev/null)"
+		[[ "$temp" && $temp -gt 0 ]] || continue
+		# TODO: determine scale?
+		temp="$(echo "scale=1; $temp/1000" | bc)" # e.g. "33.7"
+		name="$(cat $tz/type | sed 's/-thermal//g')"
+		entries="$entries|$name: $temp°C"
+		tz_count=$((tz_count+1))
+	done
+	entries="${entries:1}" # drop trailing "|"
+
+	menu_selection_backup="$menu_selection" # e.g. "> "
+	menu_selection=""
+	menu_header_extra="Thermal zones: $tz_count"
+	show_menu "$entries" "View temperature sensors"
+	menu_selection="$menu_selection_backup"
+}
+
 misc_menu() {
 	while true; do
-		show_menu "Change display rotation|Change display brightness|Drop to shell (ash)|Back..." "Miscellaneous options"
+		show_menu "Change display rotation|Change display brightness|View temperature sensors|Drop to shell (ash)|Back..." "Miscellaneous options"
 		case $menu_index in
 			0) # display orientation
 				fb_rotate_menu
@@ -486,7 +548,10 @@ misc_menu() {
 			1) # display brightness
 				display_backlight_menu
 				;;
-			2) # shell (ash)
+			2) # temp sensors
+				tz_menu
+				;;
+			3) # shell (ash)
 				sleep 0.33 # attempt avoiding garbage input from power button press
 				clear
 				echo "Dropping to ash shell, feel free to 'exit' when done!
@@ -494,7 +559,7 @@ misc_menu() {
 				shell
 				break # back to main menu
 				;;
-			3) # back
+			4) # back
 				break ;;
 		esac
 	done
@@ -599,7 +664,6 @@ usb_gadget_menu() {
 						# occurs if enabled before rndis
 						log "usb_gadget_menu(): not running toggle-mass-storage as it was already on!"
 					fi
-					#sleep 10
 				else # Disable
 					toggle-mass-storage off keep
 				fi
