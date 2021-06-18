@@ -97,8 +97,10 @@ if [ -e .config ]; then
 fi
 if [ $gen_cfg -eq 1 ]; then
 	header_ver="${BR2_KERNEL_HEADERS/./_}" # e.g. "5.12" -> "5_12"
+	$BR2_CCACHE && BR2_CCACHE=y || BR2_CCACHE=n # e.g. true -> y
 	cat ../external/configs/{initramfs_defconfig,$BR2_CONFIGS} \
-		| sed "s/@BR2_KERNEL_HEADERS@/BR2_KERNEL_HEADERS_$header_ver=y/" \
+		| sed -e "s/@BR2_KERNEL_HEADERS@/BR2_KERNEL_HEADERS_$header_ver=y/" \
+		      -e "s/@BR2_CCACHE@/BR2_CCACHE=$BR2_CCACHE/" \
 		> "$BASEDIR"/external/configs/final_defconfig
 	m final_defconfig
 fi

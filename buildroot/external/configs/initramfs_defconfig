@@ -6,7 +6,7 @@ BR2_ZCAT="pigz -d -c"
 # NOTE: This will make the initial build quite a bit slower, but subsequent
 #       builds with no/miniscule changes should yield massive gains!
 #       The directory also has to be cleared from time to time.
-BR2_CCACHE=y
+@BR2_CCACHE@
 BR2_CCACHE_INITIAL_SETUP="--max-size=10G"
 BR2_CCACHE_USE_BASEDIR=y
 

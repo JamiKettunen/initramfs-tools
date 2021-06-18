@@ -14,6 +14,9 @@ BR2_SOURCE="https://git.buildroot.net/buildroot"
 # e.g. "4.4" or "5.12"
 BR2_KERNEL_HEADERS="5.12"
 
+# Enable ccache for Builroot package building? (true|false)
+BR2_CCACHE=true
+
 # Additional Buildroot defconfig(s) to append after initramfs_defconfig; multiple ones
 # can be separated with commas (,), e.g. "extra1_defconfig,extra2_defconfig"
 # choices: see buildroot/external/configs/*
