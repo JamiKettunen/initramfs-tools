@@ -17,10 +17,10 @@ BR2_KERNEL_HEADERS="5.12"
 # Enable ccache for Builroot package building? (true|false)
 BR2_CCACHE=true
 
-# Additional Buildroot defconfig(s) to append after initramfs_defconfig; multiple ones
+# Additional Buildroot config file(s) to append after initramfs_defconfig; multiple ones
 # can be separated with commas (,), e.g. "extra1_defconfig,extra2_defconfig"
 # choices: see buildroot/external/configs/*
-BR2_CONFIGS="aarch64_a53_a73_defconfig"
+BR2_CONFIGS="aarch64_a53_a73,static_libs"
 
 # Should we skip rebuilding Buildroot tarball IF an existing one was found?
 # choices: 1 / 0 / empty to prompt user (default)

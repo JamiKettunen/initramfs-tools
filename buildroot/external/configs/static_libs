@@ -1,0 +1,2 @@
+# static binaries
+BR2_STATIC_LIBS=y

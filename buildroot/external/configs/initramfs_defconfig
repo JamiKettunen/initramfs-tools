@@ -10,9 +10,6 @@ BR2_ZCAT="pigz -d -c"
 BR2_CCACHE_INITIAL_SETUP="--max-size=10G"
 BR2_CCACHE_USE_BASEDIR=y
 
-# static binaries
-BR2_STATIC_LIBS=y
-
 # musl libc
 BR2_TOOLCHAIN_BUILDROOT_MUSL=y
 
