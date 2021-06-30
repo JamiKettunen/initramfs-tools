@@ -1,0 +1,18 @@
+--- a/CMakeLists.txt	2021-04-15 00:31:17.000000000 +0300
++++ b/CMakeLists.txt	2021-06-29 20:11:15.925347790 +0300
+@@ -10,3 +10,6 @@
+ add_executable(parse-android-dynparts main.cpp)
+ target_compile_options(parse-android-dynparts PRIVATE -Wall -Wextra -pedantic)
+ target_link_libraries(parse-android-dynparts PRIVATE lp)
++
++set_target_properties(parse-android-dynparts PROPERTIES LINK_FLAGS_RELEASE -s)
++install(TARGETS parse-android-dynparts DESTINATION ${CMAKE_INSTALL_BINDIR})
+--- a/liblp/CMakeLists.txt	2021-04-15 00:31:17.000000000 +0300
++++ b/liblp/CMakeLists.txt	2021-06-29 20:29:07.517872308 +0300
+@@ -5,3 +5,6 @@
+ 
+ find_package(OpenSSL REQUIRED)
+ target_link_libraries(lp PRIVATE OpenSSL::Crypto)
++
++set_target_properties(lp PROPERTIES LINK_FLAGS_RELEASE -s)
++install(TARGETS lp DESTINATION ${CMAKE_INSTALL_LIBDIR})

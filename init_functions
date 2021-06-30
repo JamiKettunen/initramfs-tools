@@ -84,6 +84,9 @@ parse_rootfs_par() {
 	if begins_with "nbd" "$rootfs"; then # NBD
 		load_module nbd
 		rootfs_par="/dev/nbd0"
+	elif begins_with "super:" "$rootfs"; then # Dynpart
+		touch /dev/super
+		rootfs_par="/dev/super"
 	else
 		slash_count=$(count_chars "/" "$rootfs") # e.g. 2
 		if [ $slash_count -lt 2 ]; then # invalid

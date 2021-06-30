@@ -63,15 +63,26 @@ list_pars() {
 	done
 }
 
+# Returns a /dev/XYZ partition block device based on a label
+get_par_by_name() {
+	if [ "$PARS" ]; then
+		echo "/dev/$(echo "$PARS" | awk "\$3~/'$1'/ {print \$1}")";
+	else
+		echo "/dev/$(list_pars | awk "\$3~/'$1'/ {print \$1}")";
+	fi
+}
+
 # Attempt mounting /rootfs_par; $rootfs_mount_error codes:
 # 0 = None
 # 1 = NBD export not found
 # 2 = NBD export couldn't be mounted
-# 3 = Rootfs partition mount failed
+# 3 = Super partition not found
+# 4 = Dynpart under super partition not found
+# 5 = Rootfs partition mount failed
 mount_rootfs_par() {
 	if grep -q ' /rootfs_par ' /proc/mounts; then
 		dbg "blk: mount_rootfs_par(): /rootfs_par already mounted, ignoring..."
-		return
+		rootfs_mount_error=0; return
 	fi
 	mkdir -p /rootfs_par
 
@@ -91,9 +102,28 @@ mount_rootfs_par() {
 		if ! mount /dev/nbd0 /rootfs_par; then
 			rootfs_mount_error=2; return
 		fi
+	elif begins_with "super:" "$rootfs"; then
+		ignore_pars_under=$((4*$gb_threshold))
+		ignore_pars_under_str="$(bytes_to_size $ignore_pars_under)"
+		super_dev="$(get_par_by_name super)" # e.g. "super" -> "/dev/mmcblk0p85"
+		if [ -z "$super_dev" ]; then
+			rootfs_mount_error=3; return
+		fi
+		load_module loop
+		losetup /dev/loop0 $super_dev
+		dmsetup create --concise "$(parse-android-dynparts /dev/loop0 | sed 's/,ro,/,rw,/g')"
+		super_dynpart="$(echo "$rootfs" | cut -d: -f2)" # e.g. "system_a"
+		rootfs_par="/dev/mapper/dynpart-$super_dynpart"
+		if [ ! -e "$rootfs_par" ]; then
+			rootfs_mount_error=4; return
+		fi
+		dbg "blk: mounting dynpart $super_dynpart under super partition $super_dev..."
+		if ! mount "$rootfs_par" /rootfs_par; then
+			rootfs_mount_error=5; return
+		fi
 	else # block devices
 		if ! mount "$rootfs_par" /rootfs_par; then
-			rootfs_mount_error=3; return
+			rootfs_mount_error=5; return
 		fi
 	fi
 	# clear potential previous logs from hang() calls
@@ -106,22 +136,25 @@ mount_rootfs_par() {
 # 0 = None
 # 1 = NBD export not found
 # 2 = NBD export couldn't be mounted
-# 3 = Rootfs partition mount failed
-# 4 = Rootfs directory/image not found
-# 5 = Rootfs image mount failed
+# 3 = Super partition not found
+# 4 = Dynpart under super partition not found
+# 5 = Rootfs partition mount failed
+# 6 = Rootfs directory/image not found
+# 7 = Rootfs image mount failed
 mount_rootfs() {
 	mount_rootfs_par
 	if grep -q ' /rootfs ' /proc/mounts; then
 		dbg "blk: mount_rootfs(): /rootfs already mounted, ignoring..."
-		return
+		rootfs_mount_error=0; return
 	fi
 	mkdir -p /rootfs
 
-	if [[ $slash_count -gt 2 && "$rootfs_par" != "/dev/nbd0" ]]; then # file (loopback image) or directory
+	# file (loopback image) or directory
+	if [[ $slash_count -gt 2 && "$rootfs_par" != "/dev/nbd0" && -z "$super_dynpart" ]]; then
 		rootfs_extra="$(echo "$rootfs" | cut -d/ -f4-)" # e.g. "rootfs_dir" or "rootfs.img"
 		rootfs_location="/rootfs_par/$rootfs_extra"
 		if [ ! -e "$rootfs_location" ]; then
-			rootfs_mount_error=4; return
+			rootfs_mount_error=6; return
 		fi
 
 		if [ -f "$rootfs_location" ]; then
@@ -148,7 +181,7 @@ mount_rootfs() {
 			rootfs_type="image (loopback) @ $rootfs_img on $rootfs_par"
 			load_module loop
 			if ! mount "$rootfs_location" /rootfs; then
-				rootfs_mount_error=5; return
+				rootfs_mount_error=7; return
 			fi
 		elif [ "$rootfs_dir" ]; then
 			# assume rootfs is extracted into a directory

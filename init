@@ -36,8 +36,10 @@ done
 # 1. if rd.rootfs exists, assuming it is a partition containing the rootfs
 # 2. if it contains at least 2 '/', assume beginning is partition containing
 #    either a rootfs image or directory
-# 3. alternatively, if rd.rootfs starts with "nbd:" assume the rest is a rootfs export
+# 3. if rd.rootfs starts with "nbd:" assume the rest is a rootfs export
 #    residing on the USB host machine ($HOST_IP)
+# 4. if rd.rootfs starts with "super:" assume the rest is a dynpart name in
+#    the device's super partition
 rootfs=$(get_opt rootfs) # e.g. "/dev/sde21", "/dev/sda13/.stowaways/sailfishos", "/dev/sda13/rootfs.img"
 
 # Make sure rootfs is defined on kernel cmdline
@@ -60,13 +62,22 @@ if [ $rootfs_mount_error -gt 0 ]; then
 	case $rootfs_mount_error in
 		1) hang "ERROR: Couldn't locate NBD export '$nbd_export' on $HOST_IP!" 2 ;;
 		2) hang "ERROR: Couldn't mount NBD export '$nbd_export' with block size of $nbd_bs!" 2 ;;
-		3) hang "ERROR: Couldn't mount '$rootfs_par'!" 2 ;;
-		4) log_kmsg "ERROR: Couldn't locate rootfs image/directory '$rootfs_location' under
+		3)
+			log_kmsg "ERROR: 'super' partition not found!" 2
+			list_pars_and_hang
+			;;
+		4)
+			log_kmsg "ERROR: Dynpart '$super_dynpart' under super partition not found! Here's your options:" 2
+			ls /dev/mapper/dynpart-* | cut -c21- | tee -a /init.log /dev/kmsg
+			hang
+			;;
+		5) hang "ERROR: Couldn't mount '$rootfs_par'!" 2 ;;
+		6) log_kmsg "ERROR: Couldn't locate rootfs image/directory '$rootfs_location' under
        '$rootfs_par'! Here's an 'ls -lA':" 2
 			ls -lA /rootfs_par | tee -a /init.log /dev/kmsg
 			hang
 			;;
-		5) hang "ERROR: Couldn't mount rootfs image '$rootfs_location'!" 2 ;;
+		7) hang "ERROR: Couldn't mount rootfs image '$rootfs_location'!" 2 ;;
 	esac
 fi
 init_log "Rootfs type is $rootfs_type"
