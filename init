@@ -40,7 +40,8 @@ done
 #    residing on the USB host machine ($HOST_IP)
 # 4. if rd.rootfs starts with "super:" assume the rest is a dynpart name in
 #    the device's super partition
-rootfs=$(get_opt rootfs) # e.g. "/dev/sde21", "/dev/sda13/.stowaways/sailfishos", "/dev/sda13/rootfs.img"
+rootfs=$(get_opt rootfs)
+@ROOTFS_DEFAULT_INIT@
 
 # Make sure rootfs is defined on kernel cmdline
 if [ -z "$rootfs" ]; then

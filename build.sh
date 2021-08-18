@@ -217,6 +217,11 @@ setup_misc() {
 			-e 's/@HANG_CMD@/sleep infinity/' \
 			-i initramfs/init_functions
 	fi
+	if [ $BOOT_DEFAULT_TARGET ]; then
+		sed -e "s\\@ROOTFS_DEFAULT_INIT@\\[ \$rootfs ] || rootfs=$BOOT_DEFAULT_TARGET\\" -i initramfs/init
+	else
+		sed -e '/^@ROOTFS_DEFAULT_INIT@$/d' -i initramfs/init
+	fi
 	sed -e "s/@USB_IFACE@/$BOOT_RNDIS_IFACE/" -i initramfs/init
 
 	# add initramfs revision info to /etc/os-release

@@ -87,6 +87,10 @@ CPIO_COMPRESS_ARGS=""
 # choices: 1 / 0 (default)
 CPIO_COMPRESS_KEEP_SRC=0
 
+# Default rootfs target in case one isn't defined via cmdline
+# e.g. "" (default) or "/dev/sde21"
+BOOT_DEFAULT_TARGET=""
+
 # Path to a (optionally pre-gzipped) PPM image file to show on the framebuffer when booting;
 # if this is a directory (or pre-gzipped tar archive) look for PPM animation frames to cycle
 # through during boot
