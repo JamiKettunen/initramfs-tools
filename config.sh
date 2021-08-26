@@ -121,6 +121,11 @@ BOOT_DROP_TO_SHELL=0
 # common choices include: "usb0", "rndis0" or "eth0"
 BOOT_RNDIS_IFACE="usb0"
 
+# Does the target device use OpenFirmware (device tree) based booting?
+# This should be disabled on non-embedded devices such as desktops.
+# choices: true (default) / false
+BOOT_OF=true
+
 # A list of known (safe) partitions under /dev that should be exposed via the mass-storage hook
 # instead of defaulting to all block devices
 # NOTE: Usually only the first 8 will be visible to hosts even if FSG_MAX_LUNS of 16

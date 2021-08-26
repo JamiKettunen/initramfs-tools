@@ -222,6 +222,11 @@ setup_misc() {
 	else
 		sed -e '/^@ROOTFS_DEFAULT_INIT@$/d' -i initramfs/init
 	fi
+	if $BOOT_OF; then
+		sed -e 's|@DEVICE_MODEL_SYSFS@|/sys/firmware/devicetree/base/model|' -i initramfs/init
+	else
+		sed -e 's|@DEVICE_MODEL_SYSFS@|/sys/devices/virtual/dmi/id/board_name|' -i initramfs/init
+	fi
 	sed -e "s/@USB_IFACE@/$BOOT_RNDIS_IFACE/" -i initramfs/init
 
 	# add initramfs revision info to /etc/os-release

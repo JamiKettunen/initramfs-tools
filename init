@@ -21,7 +21,7 @@ add_const HOST_IP "172.16.42.2"
 add_const USB_IP "172.16.42.1"
 add_const USB_IFACE "@USB_IFACE@" # e.g. "usb0"
 add_const KERNEL_VER "$(uname -r)" # e.g. "5.12.0-oneplus-msm8998"
-add_const DEVICE_MODEL "$(cat /sys/firmware/devicetree/base/model)" # e.g. "OnePlus 5T"
+add_const DEVICE_MODEL "$(cat @DEVICE_MODEL_SYSFS@)" # e.g. "OnePlus 5T"
 add_const NPROC $(nproc --all) # e.g. 8
 add_const MEM "$(free | awk 'NR==2 {printf "%.2f\n", $2/1024/1024}') GiB" # e.g. "5.49" or "7.46"
 init_log "Running kernel $KERNEL_VER on a $DEVICE_MODEL (with $NPROC CPUs & $MEM of RAM)"
