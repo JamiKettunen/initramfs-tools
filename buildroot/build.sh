@@ -26,7 +26,7 @@ get_ans() {
 		"ccache") [ $NON_INTERACTIVE -ne 1 ] && msg="Clean ccache located at ~/.buildroot-ccache (y/N)" || ans="N" ;;
 		"updates") [ $NON_INTERACTIVE -ne 1 ] && msg="Pull updates to buildroot tree (Y/n)" || ans="Y" ;;
 		"clean") [ $NON_INTERACTIVE -ne 1 ] && msg="Clean previous build output artifacts (y/N)" || ans="N" ;;
-		"br_config") [ $NON_INTERACTIVE -ne 1 ] && msg="Regenerate Buildroot .config from \"initramfs_defconfig ${BR2_CONFIGS//,/ }\" (y/N)" || ans="Y" ;;
+		"br_config") [ $NON_INTERACTIVE -ne 1 ] && msg="Regenerate Buildroot .config from \"${BR2_CONFIGS[@]}\" (y/N)" || ans="Y" ;;
 		"br_menuconfig") [ $NON_INTERACTIVE -ne 1 ] && msg="Run Buildroot menuconfig (y/N)" || ans="N" ;;
 		"bb_config") [ $NON_INTERACTIVE -ne 1 ] && msg="Tweak local BusyBox config \"$bb_cfg_name\" (y/N)" || ans="N" ;;
 		"bb_config_update") msg="Update \"$bb_cfg_name\" with the above diff (Y/n)" ;;
@@ -34,6 +34,7 @@ get_ans() {
 	[ $NON_INTERACTIVE -eq 1 ] && return
 	read -erp ">> $msg? " ans
 }
+join_arr() { local IFS="$1"; shift; echo "$*"; }
 m() { make BR2_EXTERNAL="$BASEDIR/external" $@; }
 
 # Script
@@ -90,6 +91,7 @@ if [ -d output ]; then
 	fi
 fi
 
+BR2_CONFIGS=(initramfs_defconfig ${BR2_CONFIGS[@]})
 gen_cfg=1
 if [ -e .config ]; then
 	get_ans br_config
@@ -99,7 +101,9 @@ if [ $gen_cfg -eq 1 ]; then
 	header_ver="${BR2_KERNEL_HEADERS/./_}" # e.g. "5.12" -> "5_12"
 	$BR2_CCACHE && BR2_CCACHE=y || BR2_CCACHE=n # e.g. true -> y
 
-	eval "sed '\$s/$/\n/' -s ../external/configs/{initramfs_defconfig,$BR2_CONFIGS}" \
+	cfg_files="$(join_arr , "${BR2_CONFIGS[@]}")"
+	[ ${#BR2_CONFIGS[@]} -gt 1 ] && cfg_files="{$cfg_files}"
+	eval "sed '\$s/$/\n/' -s ../external/configs/$cfg_files" \
 		| sed -e "s/@BR2_KERNEL_HEADERS@/BR2_KERNEL_HEADERS_$header_ver=y/" \
 		      -e "s/@BR2_CCACHE@/BR2_CCACHE=$BR2_CCACHE/" \
 		> "$BASEDIR"/external/configs/final_defconfig
