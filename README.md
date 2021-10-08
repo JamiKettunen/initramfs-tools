@@ -33,15 +33,18 @@ A bunch of the initramfs features can be configured via kernel cmdline using the
 
 ## Booting
 * Block device: `rd.rootfs=/dev/sde21`
+* Block device by UUID: e.g. `rd.rootfs=uuid:abcd-1234` or `rd.rootfs=uuid:abcd-1234/rootfs.img`
+* Block device by label: e.g. `rd.rootfs=label:system` or `rd.rootfs=label:system/rootfs.img` <sup>1</sup>
 * Image on a block device: `rd.rootfs=/dev/sda13/rootfs.img`
 * Directory on a block device: `rd.rootfs=/dev/sda13/rootfs_dir`
-* Network Block Device (NBD): `rd.rootfs=nbd` or e.g. `rd.rootfs=nbd:rootfs:512` <sup>1</sup>
+* Network Block Device (NBD): `rd.rootfs=nbd` or e.g. `rd.rootfs=nbd:rootfs:512` <sup>2</sup>
   * A default export name of `rootfs` is assumed unless specified otherwise after the first colon (`:`)
   * A default block-size of `512` is assumed (choices: `512`, `1024`, `2048` or `4096`) unless specified otherwise after the second colon (`:`)
-* Dynpart under Android super partition: `rd.rootfs=super:system_a` <sup>2</sup>
+* Dynpart under Android super partition: `rd.rootfs=super:system_a` <sup>3</sup>
 
-<sup>1</sup> **WARNING:** Make sure you don't (re)configure USB ConfigFS from userspace, or the network connection will cut out!<br>
-<sup>2</sup> **NOTE:** Remember to add `BR2_CONFIGS+=",super_par_mount"` to your config to build the required extra utilities!
+<sup>1</sup> **NOTE:** Filesystem labels containing `/` aren't supported!
+<sup>2</sup> **WARNING:** Make sure you don't (re)configure USB ConfigFS from userspace, or the network connection will cut out!<br>
+<sup>3</sup> **NOTE:** Remember to add `BR2_CONFIGS+=",super_par_mount"` to your config to build the required extra utilities!
 
 ### NBD server example
 Here is an example tree of a NBD server setup I've used successfully:

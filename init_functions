@@ -81,6 +81,28 @@ setup_extra_hooks() {
 # 1 = Invalid partition device
 parse_rootfs_par() {
 	slash_count=0
+	if begins_with "uuid:" "$rootfs"; then # UUID
+		rootfs_uuid=${rootfs%%/*} # e.g. uuid:abc/rootfs -> uuid:abc
+		rootfs_par=$(findfs UUID=${rootfs_uuid:5}) # e.g. "/dev/sda13"
+		if [ -z $rootfs_par ]; then
+			parse_rootfs_par_error=1; return
+		elif [ "$rootfs" != "$rootfs_uuid" ]; then
+			rootfs=$rootfs_par/${rootfs#*/} # e.g. /dev/sda13/rootfs
+		else
+			rootfs=$rootfs_par # e.g. /dev/sda13
+		fi
+	elif begins_with "label:" "$rootfs"; then # LABEL
+		rootfs_label=${rootfs%%/*} # e.g. label:abc/rootfs -> label:abc
+		rootfs_par=$(findfs LABEL=${rootfs_label:6}) # e.g. "/dev/sda13"
+		if [ -z $rootfs_par ]; then
+			parse_rootfs_par_error=1; return
+		elif [ "$rootfs" != "$rootfs_label" ]; then
+			rootfs=$rootfs_par/${rootfs#*/} # e.g. /dev/sda13/rootfs
+		else
+			rootfs=$rootfs_par # e.g. /dev/sda13
+		fi
+	fi
+
 	if begins_with "nbd" "$rootfs"; then # NBD
 		load_module nbd
 		rootfs_par="/dev/nbd0"
