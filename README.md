@@ -6,7 +6,7 @@ Create a `config.custom.sh`, tweak options defined in [`config.sh`](config.sh) a
 ```
 $ ./build.sh
 ```
-For e.g. scripting you can additionally add the `-N` flag to avoid interactive actions.
+For e.g. scripting you can additionally add the `-N` flag to avoid interactive actions (or `-c alternate_config.sh` to override [`config.sh`](config.sh) defaults).
 
 ## Features
 * An easily configurable environment based around [Buildroot](https://buildroot.org) & [BusyBox](https://busybox.net)

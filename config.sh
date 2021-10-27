@@ -136,6 +136,3 @@ MASS_STORAGE_KNOWN_PARTITIONS=()
 # Can also be enabled via -N arg for the build scripts
 # choices: 1 / 0 (default)
 NON_INTERACTIVE=0
-
-# Potential local config overrides
-[ -e config.custom.sh ] && . config.custom.sh || :

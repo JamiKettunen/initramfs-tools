@@ -4,6 +4,7 @@
 ###############
 BASEDIR="$(readlink -f "$(dirname "$0")")"
 INITDIR="$BASEDIR/.."
+CONFIG="config.custom.sh"
 NON_INTERACTIVE=0
 
 # Functions
@@ -11,13 +12,15 @@ NON_INTERACTIVE=0
 log() { echo ">> $1"; }
 die() { echo "$1" >&2; exit 1; }
 err() { die "ERROR: $1"; }
-usage() { die "usage: $0 [-N]"; }
+usage() { die "usage: $0 [-c alternate_config.sh] [-N]"; }
 parse_args() {
-	while getopts ":N" OPT; do
-		case "$OPT" in
-			N) NON_INTERACTIVE=1 ;;
+	while [ $# -gt 0 ]; do
+		case $1 in
+			-c|--config) CONFIG="$2"; shift ;;
+			-N|--non-interactive) NON_INTERACTIVE=1 ;;
 			*) usage ;;
 		esac
+		shift
 	done
 }
 get_ans() {
@@ -41,8 +44,9 @@ m() { make BR2_EXTERNAL="$BASEDIR/external" $@; }
 #########
 cd "$INITDIR"
 . config.sh
+parse_args "$@"
+[ -r "$CONFIG" ] && . "$CONFIG" || CONFIG="config.sh"
 cd "$BASEDIR"
-parse_args $@
 
 if [ -d $HOME/.buildroot-ccache ]; then
 	get_ans ccache

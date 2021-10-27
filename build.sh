@@ -3,6 +3,7 @@
 # Runtime vars
 ###############
 BASEDIR="$(readlink -f "$(dirname "$0")")"
+CONFIG="config.custom.sh"
 NON_INTERACTIVE=0
 
 # Functions
@@ -14,13 +15,15 @@ err() {
 	rm -rf initramfs/
 	die "ERROR: $1"
 }
-usage() { die "usage: $0 [-N]"; }
+usage() { die "usage: $0 [-c alternate_config.sh] [-N]"; }
 parse_args() {
-	while getopts ":N" OPT; do
-		case "$OPT" in
-			N) NON_INTERACTIVE=1 ;;
+	while [ $# -gt 0 ]; do
+		case $1 in
+			-c|--config) CONFIG="$2"; shift ;;
+			-N|--non-interactive) NON_INTERACTIVE=1 ;;
 			*) usage ;;
 		esac
+		shift
 	done
 }
 get_ans() {
@@ -40,8 +43,10 @@ setup_br2() {
 	fi
 
 	if [ $BR2_SKIP_BUILD -eq 0 ]; then
-		[ $NON_INTERACTIVE -eq 1 ] && BR2_ARGS="-N"
-		bash -c "$BASEDIR/buildroot/build.sh $BR2_ARGS"
+		BR2_ARGS=()
+		[ $NON_INTERACTIVE -eq 1 ] && BR2_ARGS+=("-N")
+		[ "$CONFIG" != "config.sh" ] && BR2_ARGS+=("-c $CONFIG")
+		bash -c "$BASEDIR/buildroot/build.sh ${BR2_ARGS[*]}"
 	else
 		log "Skipping Buildroot tarball rebuild..."
 	fi
@@ -283,7 +288,8 @@ create_cpio() {
 #########
 cd "$BASEDIR"
 . config.sh
-parse_args $@
+parse_args "$@"
+[ -r "$CONFIG" ] && . "$CONFIG" || CONFIG="config.sh"
 setup_br2
 
 [ -d initramfs ] && rm -rf initramfs
