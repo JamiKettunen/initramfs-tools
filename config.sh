@@ -12,7 +12,7 @@ BR2_SOURCE="https://git.buildroot.net/buildroot"
 # kernel version you plan to boot the initramfs with
 # choices: see https://www.kernel.org/ for currently supported upstream series'
 # e.g. "4.4" or "5.12"
-BR2_KERNEL_HEADERS="5.14"
+BR2_KERNEL_HEADERS="5.15"
 
 # Enable ccache for Builroot package building? (true|false)
 BR2_CCACHE=true
