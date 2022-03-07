@@ -1,0 +1,3 @@
+# Architecture (optimized for ARM11 MPCore quad-core CPU)
+BR2_arm=y
+BR2_arm11mpcore=y
