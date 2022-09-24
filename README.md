@@ -106,6 +106,9 @@ Keep in mind if disabling global VT cursor you should re-enable it on a per-root
 
 Adding `audit=0` might also help especially on distros using systemd init.
 
+## License
+All code in this repository is licensed under a [`GPL-3.0-only`](LICENSE) license.
+
 ## To-Do
 * Fix [`list_pars()`](functions/blk.sh) to work with eMMC partitions
 * Minimal BusyBox config
