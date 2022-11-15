@@ -15,7 +15,7 @@ err() {
 	rm -rf initramfs/
 	die "ERROR: $1"
 }
-usage() { die "usage: $0 [-c alternate_config.sh] [-N]"; }
+usage() { die "usage: $0 [-c|--config alternate_config.sh] [-N|--non-interactive]"; }
 parse_args() {
 	while [ $# -gt 0 ]; do
 		case $1 in
