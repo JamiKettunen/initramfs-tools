@@ -21,6 +21,11 @@ BR2_CCACHE=true
 # choices: see buildroot/external/configs/*
 BR2_CONFIGS=(aarch64_a53_a73 static_libs)
 
+# Extra buildroot config options to enable in a dynamically created
+# buildroot/external/configs/extra_config_options
+# e.g. (BR2_PACKAGE_I2C_TOOLS=y ...)
+BR2_EXTRA_CONFIG_OPTIONS=()
+
 # Should we skip rebuilding Buildroot tarball IF an existing one was found?
 # choices: 1 / 0 / empty to prompt user (default)
 BR2_SKIP_BUILD=

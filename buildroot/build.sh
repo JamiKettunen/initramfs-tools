@@ -96,6 +96,13 @@ if [ -d output ]; then
 fi
 
 BR2_CONFIGS=(initramfs_defconfig ${BR2_CONFIGS[@]})
+if [ ${#BR2_EXTRA_CONFIG_OPTIONS[@]} -gt 0 ]; then
+	{
+		echo "# additions from BR2_EXTRA_CONFIG_OPTIONS"
+		for opt in "${BR2_EXTRA_CONFIG_OPTIONS[@]}"; do echo "$opt"; done
+	} > "$BASEDIR"/external/configs/extra_config_options
+	BR2_CONFIGS+=(extra_config_options)
+fi
 gen_cfg=1
 if [ -e .config ]; then
 	get_ans br_config
