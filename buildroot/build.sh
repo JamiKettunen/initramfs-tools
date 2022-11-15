@@ -104,6 +104,10 @@ fi
 if [ $gen_cfg -eq 1 ]; then
 	header_ver="${BR2_KERNEL_HEADERS/./_}" # e.g. "5.12" -> "5_12"
 	$BR2_CCACHE && BR2_CCACHE=y || BR2_CCACHE=n # e.g. true -> y
+	if [ ! -x "$(command -v ccache)" ]; then
+		log "WARN: 'ccache' executable not found, setting BR2_CCACHE=n..."
+		BR2_CCACHE=n
+	fi
 
 	cfg_files="$(join_arr , "${BR2_CONFIGS[@]}")"
 	[ ${#BR2_CONFIGS[@]} -gt 1 ] && cfg_files="{$cfg_files}"
