@@ -68,7 +68,7 @@ setup_kmodules() {
 		warn "Skipping kernel modules due to '$KERNEL_MODULES_DIR' not existing!"
 		return
 	fi
-	modules_dep="$(find "$KERNEL_MODULES_DIR" -type f -name modules.dep 2>/dev/null || :)"
+	modules_dep="$(find "$KERNEL_MODULES_DIR"/ -type f -name modules.dep 2>/dev/null || :)"
 	if [ -z "$modules_dep" ]; then
 		warn "Skipping kernel modules as no modules.dep was found under '$KERNEL_MODULES_DIR'!"
 		return
