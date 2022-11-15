@@ -1,0 +1,2 @@
+. /init_functions
+echo '/init_functions has been sourced for your convenience.'

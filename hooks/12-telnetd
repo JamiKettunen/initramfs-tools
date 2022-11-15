@@ -11,7 +11,7 @@ start_telnetd() {
 	pgrep telnetd >/dev/null && return # already done
 
 	dbg "start_telnetd(): Starting on $USB_IP:23 (forks to background)..."
-	telnetd -b "$USB_IP" -l /bin/sh || log "Failed to start telnetd!"
+	telnetd -b "$USB_IP" -l /usr/bin/login-sh || log "Failed to start telnetd!"
 }
 
 start_telnetd
