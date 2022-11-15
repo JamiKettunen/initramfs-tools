@@ -72,6 +72,12 @@ setup_kmodules() {
 	if [ -z "$modules_dep" ]; then
 		warn "Skipping kernel modules as no modules.dep was found under '$KERNEL_MODULES_DIR'!"
 		return
+	elif [ $(echo "$modules_dep" | wc -l) -gt 1 ]; then
+		err "KERNEL_MODULES_DIR of '$KERNEL_MODULES_DIR' is
+       too ambiguous as >1 modules.dep files were found as follows:
+
+$(while read line; do echo "       ${line/$HOME/\~}"; done < <(echo "$modules_dep"))
+"
 	fi
 
 	modules="$(dirname "$modules_dep")" # e.g. ".../lib/modules/5.12.0-msm8998"
